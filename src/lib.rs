@@ -22,7 +22,8 @@ pub use accelerometer::{
 pub use register::{DataRate, Mode, Range, Register,InternalFreqFine};
 use register::{DEVICE_ID,
                XL_EN_MASK,
-               FS_EN_MASK,};
+               FS_EN_MASK,
+               TIMESTAMP_EN,};
 
 use core::fmt::Debug;
 
@@ -99,13 +100,13 @@ where
     pub fn start(&mut self) {
         self.modify_register( Register::CTRL1_XL.addr(), 
                              XL_EN_MASK, 
-                              0b101);
+                              0b101).unwrap();
     }
 
     pub fn set_range(&mut self, range: Range) {
         self.modify_register( Register::CTRL1_XL.addr(), 
                               FS_EN_MASK, 
-                              range.bits());
+                              range.bits()).unwrap();
     }
 
     /// Get the device ID
@@ -158,6 +159,7 @@ where
     /// I chose the simplistic way, since this is my first rs dd.
     /// 
     /// Also, test this, it is a slippery slope.
+    /// TODO willing to put error cases here. 
     fn modify_register(&mut self, reg: u8, mask: u8, val: u8) -> Result<(),()>
     {
         if mask == 0 {return Err(());}
@@ -175,7 +177,6 @@ where
                 bitshift += 1;
             }
         }
-        defmt::debug!("bitshift: {}", bitshift);
 
         // 0x0010_0110 <- init
         // 0x0111_0000 <- mask
@@ -186,14 +187,21 @@ where
         // 
         // set init with set mask
         // 0x0000_0110 | (val << 4) which is 0b0101_0000 = 0b0101_0110
+
         let clear_mask = !mask;
         let set_mask = val << bitshift;
         register_value[0] = (register_value[0] & clear_mask) | set_mask;
-        defmt::debug!("reg written: {=u8:#010b}", register_value[0]);
+        defmt::debug!("{=u8:#010b} written to {=u8:#010b}", register_value[0], reg);
         self.write_reg( reg, register_value[0]);
-        Ok(())  
+        Ok(())
     }
 
+    pub fn get_odr_raw(&mut self) -> i8{
+        // Get it from reading FINE ODR
+        let mut buff = [0u8];
+        self.read_reg(Register::INTERNAL_FREQ_FINE.addr(), &mut buff);
+        buff[0] as i8
+    }
     pub fn get_odr(&mut self) -> f32{
         // Get it from reading FINE ODR
         let mut buff = [0u8];
@@ -202,18 +210,35 @@ where
         26667.0 + (((correction as f32)* 0.0015)* 26667.0)
     }
 
-    pub fn one_shot_acc(&mut self){
+    pub fn get_timestamp_us (&mut self) -> f32 {
+        let odr_raw = self.get_odr_raw();
+        let resolution = 1f32 / (80000f32 + (0.0015 * odr_raw as f32 * 80000f32));
+        // TODO read multiple regs
+        let tstamp_raw = self.get_timestamp_raw();
+        tstamp_raw as f32 * resolution 
+        }
+
+    pub fn get_timestamp_raw (&mut self) -> u32 {
+        // TODO read multiple regs
+        let mut bytes = [0u8; 4+1];
+        bytes[0] = Register::TIMESTAMP0.addr() | SPI_READ;
+
+        self.read(&mut bytes);
+        let tstamp_lsb = bytes[4] as u16 + (bytes[3] as u16) * 256;
+        let tstamp_msb = bytes[1] as u16 + (bytes[2] as u16) * 256;
+        tstamp_lsb as u32 + (tstamp_msb as u32 * 256 * 256)
+    }
+
+    pub fn set_timestamp_en (&mut self, state: bool){
+        self.modify_register( Register::CTRL10_C.addr(), 
+                            TIMESTAMP_EN, state as u8).unwrap();
+    }
+    pub fn one_shot_acc(&mut self) -> (f32,f32,f32) {
+        // TODO read multiple regs
         let mut bytes = [0u8; 6+1];
         bytes[0] = Register::OUTX_L_A.addr() | SPI_READ;
-        defmt::debug!("bytes: {=[u8]:#x}", bytes);
         self.read(&mut bytes);
-        defmt::debug!("bytes: {=[u8]:#x}", bytes);
 
-        // defmt::debug!("byte1: {=u8:#x}",bytes[1]);
-        // defmt::debug!("byte1: {=u16:#x}",bytes[1] as u16);
-        // defmt::debug!("byte1: {=i16:#x}",bytes[1] as u16 as i16);
-
-        // TEST THIS 
         let x_u16 = bytes[1] as u16 + (bytes[2] as u16) * 256;
         let y_u16 = bytes[3] as u16 + (bytes[4] as u16) * 256;
         let z_u16 = bytes[5] as u16 + (bytes[6] as u16) * 256;
@@ -222,11 +247,8 @@ where
         let y = y_u16 as i16;
         let z = z_u16 as i16;
 
-        defmt::info!("x: {=f32},y: {=f32},z: {=f32}", 
-                        x as f32 * 0.061,
-                        y as f32 * 0.061,
-                        z as f32 * 0.061);
-    }   
+        (x as f32 * 0.061, y as f32 * 0.061, z as f32 * 0.061)
+    }
 }
 
 impl<SPI, CS, E, PinError> RawAccelerometer<I16x3> for IIS3DWB <SPI, CS>

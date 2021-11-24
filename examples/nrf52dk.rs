@@ -67,11 +67,13 @@ fn main() -> ! {
     // defmt::info!("The device temperature is: 0x{=u16:x}", temp);
 
     accelerometer.start();
+    accelerometer.set_timestamp_en(true);
     loop{
         cortex_m::asm::delay(50_000_000);   // KISS.
         let mut acc  = accelerometer.accel_norm().unwrap();
         let mut odr  = accelerometer.sample_rate().unwrap();
-        defmt::info!("{},{},{},{}",acc.x,acc.y,acc.z,odr);
+        let mut tstamp   = accelerometer.get_timestamp_raw();
+        defmt::info!("{} gs,{} gs,{} gs,{} Hz,{} us",acc.x,acc.y,acc.z,odr,tstamp);
     }
     // let temp = accelerometer.read_temp_raw();
     // defmt::info!("The device temperature is: 0x{=u16:x}", temp);
