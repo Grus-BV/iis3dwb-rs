@@ -75,8 +75,6 @@ fn main() -> ! {
         let mut tstamp   = accelerometer.get_timestamp_raw();
         defmt::info!("{} gs,{} gs,{} gs,{} Hz,{} us",acc.x,acc.y,acc.z,odr,tstamp);
     }
-    // let temp = accelerometer.read_temp_raw();
-    // defmt::info!("The device temperature is: 0x{=u16:x}", temp);
 
     exit();
 }
