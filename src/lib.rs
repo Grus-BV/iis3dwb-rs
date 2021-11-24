@@ -19,7 +19,7 @@ pub use accelerometer::{
 
 // use interrupts::{Interrupt1, Interrupt2};
 // use wakeups::{WakeUp};
-pub use register::{DataRate, Mode, Range, Register};
+pub use register::{DataRate, Mode, Range, Register,InternalFreqFine};
 use register::{DEVICE_ID,
                XL_EN_MASK,
                FS_EN_MASK,};
@@ -118,7 +118,7 @@ where
 
       /// Returns the raw contents of the temperature registers
     pub fn read_temp_raw(&mut self) -> u16 {
-        let mut bytes = [Register::OUT_TEMP_H.addr() | SPI_READ, 0, 0];
+        let mut bytes = [Register::OUT_TEMP_L.addr() | SPI_READ, 0, 0];
         self.read(&mut bytes);
 
         let temp_h = ((bytes[1] & 0x0F) as u16) << 8;
@@ -136,8 +136,10 @@ where
 
     fn read_reg(&mut self, reg: u8, buffer: &mut [u8]) {
         let mut bytes = [ reg | SPI_READ, 0];
+        defmt::debug!("spi_bytes: {=[u8]:x}", bytes);
         self.cs.set_low().ok();
         self.spi.transfer(&mut bytes).ok();
+        defmt::debug!("spi_bytes after xfer: {=[u8]:x}", bytes);
         self.cs.set_high().ok();
         buffer[0] = bytes[1];
     }
@@ -160,7 +162,9 @@ where
     {
         if mask == 0 {return Err(());}
         let mut register_value=[0u8]; 
+        defmt::debug!("val: {=u8:#010b} reg: {=u8:x} mask: {=u8:#010b}", val, reg, mask);
         self.read_reg( reg,&mut register_value);
+        defmt::debug!("device values reg: {=u8:#010b}", register_value[0]);
         let mut bitshift = 0u8;
         let mut sacrificial_mask = mask.clone();
         //ugly dangerous loop calculating shifts 
@@ -171,6 +175,8 @@ where
                 bitshift += 1;
             }
         }
+        defmt::debug!("bitshift: {}", bitshift);
+
         // 0x0010_0110 <- init
         // 0x0111_0000 <- mask
         // 0x0000_0101 <- value
@@ -183,9 +189,44 @@ where
         let clear_mask = !mask;
         let set_mask = val << bitshift;
         register_value[0] = (register_value[0] & clear_mask) | set_mask;
+        defmt::debug!("reg written: {=u8:#010b}", register_value[0]);
         self.write_reg( reg, register_value[0]);
         Ok(())  
-    }    
+    }
+
+    pub fn get_odr(&mut self) -> f32{
+        // Get it from reading FINE ODR
+        let mut buff = [0u8];
+        self.read_reg(Register::INTERNAL_FREQ_FINE.addr(), &mut buff);
+        let correction = buff[0] as i8;
+        26667.0 + (((correction as f32)* 0.0015)* 26667.0)
+    }
+
+    pub fn one_shot_acc(&mut self){
+        let mut bytes = [0u8; 6+1];
+        bytes[0] = Register::OUTX_L_A.addr() | SPI_READ;
+        defmt::debug!("bytes: {=[u8]:#x}", bytes);
+        self.read(&mut bytes);
+        defmt::debug!("bytes: {=[u8]:#x}", bytes);
+
+        // defmt::debug!("byte1: {=u8:#x}",bytes[1]);
+        // defmt::debug!("byte1: {=u16:#x}",bytes[1] as u16);
+        // defmt::debug!("byte1: {=i16:#x}",bytes[1] as u16 as i16);
+
+        // TEST THIS 
+        let x_u16 = bytes[1] as u16 + (bytes[2] as u16) * 256;
+        let y_u16 = bytes[3] as u16 + (bytes[4] as u16) * 256;
+        let z_u16 = bytes[5] as u16 + (bytes[6] as u16) * 256;
+
+        let x = x_u16 as i16;
+        let y = y_u16 as i16;
+        let z = z_u16 as i16;
+
+        defmt::info!("x: {=f32},y: {=f32},z: {=f32}", 
+                        x as f32 * 0.061,
+                        y as f32 * 0.061,
+                        z as f32 * 0.061);
+    }   
 }
 
 impl<SPI, CS, E, PinError> RawAccelerometer<I16x3> for IIS3DWB <SPI, CS>
@@ -204,11 +245,31 @@ where
         self.read(&mut bytes);
 
         // TEST THIS 
-        let x = bytes[1] as i16 + (bytes[2] as i16) <<8;
-        let y = bytes[3] as i16 + (bytes[4] as i16) <<8;
-        let z = bytes[5] as i16 + (bytes[6] as i16) <<8;
+        let x = (bytes[1] as u16 + (bytes[2] as u16) * 256 ) as i16;
+        let y = (bytes[3] as u16 + (bytes[4] as u16) * 256 ) as i16;
+        let z = (bytes[5] as u16 + (bytes[6] as u16) * 256 ) as i16;
 
         Ok(I16x3::new(x, y, z))
     }
+}
 
+impl<SPI, CS, E, PinError> Accelerometer for IIS3DWB <SPI, CS>
+where
+    SPI: spi::Transfer<u8, Error=E> + spi::Write<u8, Error=E>,
+    CS: OutputPin<Error = PinError>,
+    E: Debug
+{
+    type Error = E;
+
+    fn accel_norm(&mut self) -> Result<F32x3, Error<Self::Error>> {
+
+        let raw_values = self.accel_raw().unwrap();
+        let norm_values: F32x3 = F32x3::new(raw_values[0] as f32 *0.061 / 1000.0,
+                                            raw_values[1] as f32 *0.061 / 1000.0,
+                                            raw_values[2] as f32 *0.061 / 1000.0);
+        Ok(norm_values)
+    }
+    fn sample_rate(&mut self) -> Result<f32, Error<Self::Error>> {
+        Ok(self.get_odr())
+    }
 }

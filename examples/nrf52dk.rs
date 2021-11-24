@@ -8,7 +8,6 @@ use defmt_rtt as _;
 use cortex_m_rt::entry;
 use defmt::*;
 use defmt::panic;
-use accelerometer;
 use embedded_hal::blocking::spi::*;
 use nrf52840_hal:: {gpio,
                     spim,
@@ -17,7 +16,8 @@ use nrf52840_hal:: {gpio,
                     Spim,
                     };
 
-use iis3dwb::{Config as IIS3DWBConfig, Range, IIS3DWB};
+use iis3dwb::{Config as IIS3DWBConfig, Range, IIS3DWB, 
+                        Accelerometer, RawAccelerometer};
 
 
 use panic_probe as _;
@@ -53,7 +53,7 @@ fn main() -> ! {
     let mut spi =   Spim::new(
         p.SPIM3,
         spi_pins,
-        nrf52840_hal::spim::Frequency::M16,
+        nrf52840_hal::spim::Frequency::M1,
         nrf52840_hal::spim::MODE_3, 
         0
     );
@@ -61,8 +61,21 @@ fn main() -> ! {
     let mut acc_cfg = IIS3DWBConfig::default();
 
     let mut accelerometer = IIS3DWB::new(spi, ncs, &acc_cfg).unwrap();
-    let mut id = accelerometer.get_device_id();
-    defmt::info!("The device ID is: {=u8:x}", id);
+    let id = accelerometer.get_device_id();
+    defmt::info!("The device ID is: 0x{=u8:x}", id);
+    // let temp = accelerometer.read_temp_raw();
+    // defmt::info!("The device temperature is: 0x{=u16:x}", temp);
+
+    accelerometer.start();
+    loop{
+        cortex_m::asm::delay(50_000_000);   // KISS.
+        let mut acc  = accelerometer.accel_norm().unwrap();
+        let mut odr  = accelerometer.sample_rate().unwrap();
+        defmt::info!("{},{},{},{}",acc.x,acc.y,acc.z,odr);
+    }
+    // let temp = accelerometer.read_temp_raw();
+    // defmt::info!("The device temperature is: 0x{=u16:x}", temp);
+
     exit();
 }
 
