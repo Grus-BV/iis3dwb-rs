@@ -5,10 +5,10 @@ mod interrupts;
 mod wakeups;
 
 /// Is there a way to improve this to non blocking? Does that require async? 
-use embedded_hal::blocking::spi;
+pub use embedded_hal::blocking::spi;
 
 use embedded_hal::digital::v2::OutputPin;
-
+pub use interrupts::{Interrupt1,InterruptConfigSrc1,InterruptSource1};
 pub use accelerometer::{
     Accelerometer,
     RawAccelerometer,
@@ -19,7 +19,8 @@ pub use accelerometer::{
 
 // use interrupts::{Interrupt1, Interrupt2};
 // use wakeups::{WakeUp};
-pub use register::{DataRate, Mode, Range, Register,InternalFreqFine};
+pub use register::{ DataRate, Mode, Range, Register,
+                    InternalFreqFinetuned, Timestamp,};
 use register::{DEVICE_ID,
                XL_EN_MASK,
                FS_EN_MASK,
@@ -35,11 +36,11 @@ pub struct Config {
     pub mode: Mode,
     pub datarate: DataRate,
     pub enable_x_axis: bool,   
-    pub enable_y_axis: bool,   
+    pub enable_y_axis: bool,    
     pub enable_z_axis: bool,   
     pub enable_temp:bool,
     pub range: Range,
-    // pub interrupt1: Range,
+    pub interrupt1: Interrupt1,
     // pub interrupt2: Range,
     // pub wake_up: WakeUp,
 }
@@ -54,7 +55,7 @@ impl Default for Config{
             enable_z_axis: true,   
             enable_temp: true,
             range: Range::G2,
-            // interrupt1: Interrupt1::None,
+            interrupt1: Interrupt1::,
             // interrupt2: Interrupt2::None,
             // wake_up: WakeUp::None,
         }
@@ -67,7 +68,7 @@ pub struct IIS3DWB <SPI, CS>{
     cs  : CS,
     // configuration 
     range : Range,
-    // interrupt1: Interrupt1,
+    interrupt1: Interrupt1,
     // interrupt2: Interrupt2,
     // wake_up: WakeUp,
 }
@@ -83,7 +84,7 @@ where
             spi,
             cs, 
             range: config.range,
-            // interrupt1: config.interrupt1,
+            interrupt1: config.interrupt1,
             // interrupt2: config.interrupt2,
             // wake_up: config.wake_up
         };
@@ -156,7 +157,7 @@ where
     }
 
     /// Ask TweedeGolf about their implementation, why pass function?
-    /// I chose the simplistic way, since this is my first rs dd.
+    /// I chose a simplistic way, since this is my first rs dd.
     /// 
     /// Also, test this, it is a slippery slope.
     /// TODO willing to put error cases here. 
@@ -196,29 +197,14 @@ where
         Ok(())
     }
 
-    pub fn get_odr_raw(&mut self) -> i8{
+    pub fn get_odr(&mut self) -> InternalFreqFinetuned {
         // Get it from reading FINE ODR
         let mut buff = [0u8];
         self.read_reg(Register::INTERNAL_FREQ_FINE.addr(), &mut buff);
-        buff[0] as i8
-    }
-    pub fn get_odr(&mut self) -> f32{
-        // Get it from reading FINE ODR
-        let mut buff = [0u8];
-        self.read_reg(Register::INTERNAL_FREQ_FINE.addr(), &mut buff);
-        let correction = buff[0] as i8;
-        26667.0 + (((correction as f32)* 0.0015)* 26667.0)
+        InternalFreqFinetuned(buff[0])
     }
 
-    pub fn get_timestamp_us (&mut self) -> f32 {
-        let odr_raw = self.get_odr_raw();
-        let resolution = 1f32 / (80000f32 + (0.0015 * odr_raw as f32 * 80000f32));
-        // TODO read multiple regs
-        let tstamp_raw = self.get_timestamp_raw();
-        tstamp_raw as f32 * resolution 
-        }
-
-    pub fn get_timestamp_raw (&mut self) -> u32 {
+    pub fn get_timestamp (&mut self) -> Timestamp {
         // TODO read multiple regs
         let mut bytes = [0u8; 4+1];
         bytes[0] = Register::TIMESTAMP0.addr() | SPI_READ;
@@ -226,7 +212,7 @@ where
         self.read(&mut bytes);
         let tstamp_lsb = bytes[4] as u16 + (bytes[3] as u16) * 256;
         let tstamp_msb = bytes[1] as u16 + (bytes[2] as u16) * 256;
-        tstamp_lsb as u32 + (tstamp_msb as u32 * 256 * 256)
+        Timestamp(tstamp_lsb as u32 + (tstamp_msb as u32 * 256 * 256))
     }
 
     pub fn set_timestamp_en (&mut self, state: bool){
@@ -248,6 +234,10 @@ where
         let z = z_u16 as i16;
 
         (x as f32 * 0.061, y as f32 * 0.061, z as f32 * 0.061)
+    }
+    // destroy the instance and return the spi bus and its cs pin
+    pub fn destroy(self) -> (SPI, CS) {
+        (self.spi, self.cs)
     }
 }
 

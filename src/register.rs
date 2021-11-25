@@ -1,3 +1,4 @@
+#![allow(unused_variables)]
 use num_enum::TryFromPrimitive;
 
 /// Possible I²C slave addresses.
@@ -206,9 +207,10 @@ impl DataRate {
     }
 }
 
-pub struct InternalFreqFine (pub(crate) u8);
-impl InternalFreqFine {
-    pub const fn val(self) -> i8 {
+/// This is 
+pub struct InternalFreqFinetuned (pub(crate) u8);
+impl InternalFreqFinetuned {
+    pub const fn raw(self) -> i8 {
         self.0 as i8
     }
 
@@ -239,6 +241,20 @@ impl Duration {
         Self::seconds(output_data_rate, miliseconds * 1000.0)
     }
 }
+
+#[derive(Copy,Clone,Debug,PartialEq, Eq)]
+pub struct Timestamp(pub(crate) u32);
+impl Timestamp {
+    pub fn raw(self) -> u32 {
+        self.0
+    }
+    pub fn us(self, odr: InternalFreqFinetuned) -> f32 {
+       (self.raw() as f32) * 1f32 / (80000f32 + (0.0015 * odr.raw() as f32 * 80000f32))
+    }
+}
+
+
+
 
 // TODO: Repurpose tis with FIFO Statuses.
 // 
@@ -341,6 +357,9 @@ pub const FDS: u8 = 0b00000100;
 
 
 // === CTRL7_C (16h) ===
-
 pub const TIMESTAMP_EN: u8 = 0b00100000;
+
+
+// === INTERRUPTS_EN (58h) ===
+pub const INTERRUPTS_EN: u8 = 0b1000_0000;
 
