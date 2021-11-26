@@ -5,7 +5,6 @@
 
 use crate::register::*;
 use crate::{IIS3DWB, spi, OutputPin};
-use accelerometer::Error;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
@@ -24,6 +23,7 @@ impl InterruptSource1{
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 /// An easy way to associate these bools to the enums?
 pub struct InterruptConfigSrc1 {
     AccDataReady :bool,
@@ -65,15 +65,16 @@ impl InterruptConfigSrc1 {
         iters
     }
 }
-
 impl Default for InterruptConfigSrc1{
     fn default() -> Self {
         Self::none()
     }
 }
-
+#[derive(Copy, Clone, Debug)]
 pub struct Interrupt1 {
-    cfg: InterruptConfigSrc1,
+    pub cfg: InterruptConfigSrc1,
+    // GPIO definitions TODO
+    // IRQ? 
 }
 impl Default for Interrupt1{
     fn default() -> Self {
@@ -93,9 +94,7 @@ where
     } 
 
     /// We are enabling all interrupts here, TODO, .
-    pub fn enable_all_interrupts(&self){
+    pub fn enable_all_interrupts(&mut self){
         self.write_reg(Register::INTERRUPTS_EN.addr(), INTERRUPTS_EN);
     }
-
-    
 }

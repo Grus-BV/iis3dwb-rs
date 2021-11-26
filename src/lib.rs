@@ -55,7 +55,7 @@ impl Default for Config{
             enable_z_axis: true,   
             enable_temp: true,
             range: Range::G2,
-            interrupt1: Interrupt1::,
+            interrupt1: Interrupt1::default(),
             // interrupt2: Interrupt2::None,
             // wake_up: WakeUp::None,
         }
@@ -282,6 +282,6 @@ where
         Ok(norm_values)
     }
     fn sample_rate(&mut self) -> Result<f32, Error<Self::Error>> {
-        Ok(self.get_odr())
+        Ok(self.get_odr().hz())
     }
 }
