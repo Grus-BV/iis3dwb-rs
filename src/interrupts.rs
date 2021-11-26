@@ -26,12 +26,12 @@ impl InterruptSource1{
 #[derive(Copy, Clone, Debug)]
 /// An easy way to associate these bools to the enums?
 pub struct InterruptConfigSrc1 {
-    AccDataReady :bool,
-    BootStatus :bool,
-    FifoThreshold  :bool,
-    FifoOverrun :bool,
-    FifoFull :bool,
-    BDRCounter :bool,
+    pub AccDataReady :bool,
+    pub BootStatus :bool,
+    pub FifoThreshold  :bool,
+    pub FifoOverrun :bool,
+    pub FifoFull :bool,
+    pub BDRCounter :bool,
 }
 impl InterruptConfigSrc1 {
     pub const fn none()-> Self{
@@ -96,5 +96,9 @@ where
     /// We are enabling all interrupts here, TODO, .
     pub fn enable_all_interrupts(&mut self){
         self.write_reg(Register::INTERRUPTS_EN.addr(), INTERRUPTS_EN);
+    }
+
+    pub fn on_irq1(&mut self){
+        //TODO handle irq.
     }
 }

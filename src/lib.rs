@@ -95,6 +95,7 @@ where
         }
         // set_range
         iis3dwb.set_range(iis3dwb.range);
+        iis3dwb.set_interrupt_1(iis3dwb.interrupt1);
         Ok(iis3dwb)
     }  
 
@@ -131,6 +132,7 @@ where
 
     fn write_reg(&mut self, reg: u8, value: u8) {
         let mut bytes = [ reg | SPI_WRITE, value];
+        defmt::debug!("spi_bytes: {=[u8]:x}", bytes);
         self.cs.set_low().ok();
         self.spi.write(&mut bytes).ok();
         self.cs.set_high().ok();
