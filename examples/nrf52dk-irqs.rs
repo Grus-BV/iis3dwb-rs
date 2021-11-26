@@ -6,6 +6,7 @@ use defmt_rtt as _;
 use cortex_m_rt::entry;
 use defmt::*;
 use defmt::panic;
+use embedded_hal::digital::v2::OutputPin;
 use embedded_hal::blocking::spi::*;
 use nrf52840_hal:: {gpio,
                     spim,
@@ -13,12 +14,12 @@ use nrf52840_hal:: {gpio,
                     gpio::Level,
                     gpiote::*,
                     Spim,
-                    pac::CLOCK
+                    pac::CLOCK,
                     };
 
 use iis3dwb::{Config as IIS3DWBConfig, Range, IIS3DWB, 
                         Accelerometer, RawAccelerometer};
-
+use nrf52840_hal::pac::interrupt;
 
 use panic_probe as _;
 #[defmt::panic_handler]
@@ -32,7 +33,12 @@ pub fn exit() -> ! {
     }
 }
 
-// #[entry]
+#[interrupt]
+fn GPIOTE (){
+    debug!("in!");
+}
+
+#[entry]
 fn main() -> ! {
     info!("running!");
 
@@ -41,13 +47,13 @@ fn main() -> ! {
     let p = nrf52840_hal::pac::Peripherals::take().unwrap();
     let port0 = p0::Parts::new(p.P0);
     let ncs = port0.p0_14.into_push_pull_output(Level::High);
+    let mut heartbeat = port0.p0_00.into_push_pull_output(Level::High);
     let spiclk = port0.p0_13.into_push_pull_output(Level::Low).degrade();
     let spimiso = port0.p0_15.into_floating_input().degrade();
     let spimosi = port0.p0_16.into_push_pull_output(Level::Low).degrade();
     let int1 = port0.p0_12.into_pulldown_input().degrade();
 
-
-    let gpiote = Gpiote::new(Gpiote);
+    let gpiote = Gpiote::new( p.GPIOTE);
 
     gpiote
             .channel0()
@@ -73,17 +79,23 @@ fn main() -> ! {
     let mut irqs = acc_cfg.interrupt1.cfg;
     irqs.AccDataReady = true;
 
-
-
-
-
     let mut accelerometer = IIS3DWB::new(spi, ncs, &acc_cfg).unwrap();
     let id = accelerometer.get_device_id();
     defmt::info!("The device ID is: 0x{=u8:x}", id);
     // let temp = accelerometer.read_temp_raw();
     // defmt::info!("The device temperature is: 0x{=u16:x}", temp);
     accelerometer.start();
-    
+    accelerometer.enable_all_interrupts();
+    loop {
+        cortex_m::asm::delay(1000_0000);
+        info!("Lo");
+        heartbeat.set_low().unwrap();
+        cortex_m::asm::delay(1000_0000);
+        info!("Hi");
+        heartbeat.set_high().unwrap();
+    }
     exit();
 }
+
+
 
