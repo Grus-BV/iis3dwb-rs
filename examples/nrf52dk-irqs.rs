@@ -1,4 +1,13 @@
-//! This example is for the nRF 52 DK 
+//! In this example the IIS3DWB is configured to raise an interrupt 
+//! in the case when new accelerometer data is available. 
+//! 
+//! Ideally, this is an infinite cycle, since data is available with
+//! a frequency of ODR, 26667Hz. 
+//! 
+//! In our case, we do not read the next value, therefore we only enter 
+//! the interrupt routine once. 
+//! 
+//! Ideally, a crate that manages all these should be used. 
 #![no_std]
 #![no_main]
 
@@ -45,7 +54,7 @@ pub fn exit() -> ! {
 
 #[interrupt]
 fn GPIOTE (){
-    debug!("in!");
+    debug!("Inside IRQ!");
     cortex_m::interrupt::free(|cs| {
                                 let gpiote = G_GPIOTE.borrow(cs).borrow();
                                 if let Some(gpiote) = gpiote.as_ref(){
@@ -96,10 +105,11 @@ fn main() -> ! {
     );
 
     let mut acc_cfg = IIS3DWBConfig::default();
-    let mut irqs = acc_cfg.interrupt1.cfg;
-    irqs.AccDataReady = true;
+    acc_cfg.interrupt1.cfg.AccDataReady = true;
 
     let mut accelerometer = IIS3DWB::new(spi, ncs, &acc_cfg).unwrap();
+    accelerometer.disable_all_interrupts();
+
     let id = accelerometer.get_device_id();
     defmt::info!("The device ID is: 0x{=u8:x}", id);
     // let temp = accelerometer.read_temp_raw();
