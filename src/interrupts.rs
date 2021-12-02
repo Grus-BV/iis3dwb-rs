@@ -97,7 +97,6 @@ where
     pub fn enable_all_interrupts(&mut self){
         self.write_reg(Register::INTERRUPTS_EN.addr(), INTERRUPTS_EN);
     }
-
     /// We are enabling all interrupts here, TODO, .
     pub fn disable_all_interrupts(&mut self){
         self.write_reg(Register::INTERRUPTS_EN.addr(), 0);
