@@ -5,7 +5,6 @@
 
 use crate::register::*;
 use crate::{IIS3DWB, spi, OutputPin};
-use defmt::debug;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
@@ -97,6 +96,11 @@ where
     /// We are enabling all interrupts here, TODO, .
     pub fn enable_all_interrupts(&mut self){
         self.write_reg(Register::INTERRUPTS_EN.addr(), INTERRUPTS_EN);
+    }
+
+    /// We are enabling all interrupts here, TODO, .
+    pub fn disable_all_interrupts(&mut self){
+        self.write_reg(Register::INTERRUPTS_EN.addr(), 0);
     }
     pub fn enable_drdy (&mut self){
         self.write_reg(Register::CTRL4_C.addr(), DRDY_MASK);

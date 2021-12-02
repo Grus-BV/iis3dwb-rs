@@ -1,32 +1,33 @@
-//! This example is for the nRF 52 DK 
+//! In this example the IIS3DWB is configured to raise an interrupt 
+//! in the case when new accelerometer data is available. 
+//! 
+//! Ideally, this is an infinite cycle, since data is available with
+//! a frequency of ODR, 26667Hz. 
+//! 
+//! In our case, we do not read the next value, therefore we only enter 
+//! the interrupt routine once. 
+//! 
+//! Ideally, a crate that manages all these should be used. 
 #![no_std]
 #![no_main]
 
-use core::{borrow::{Borrow, BorrowMut}, ops::Deref};
+use core::{borrow::{BorrowMut}, ops::Deref};
 
 use cortex_m::interrupt::Nr;
 use defmt_rtt as _;
 use cortex_m_rt::entry;
 use defmt::*;
-use defmt::panic;
 use embedded_hal::digital::v2::OutputPin;
-use embedded_hal::blocking::spi::*;
-use nrf52840_hal:: {gpio,
-                    spim,
+use nrf52840_hal:: {spim,
                     gpio::p0,   
                     gpio::Level,
                     gpiote::*,
-                    Spim,
-                    pac::CLOCK,
-                    pac::NVIC,
                     };
 
-use iis3dwb::{Config as IIS3DWBConfig, Range, IIS3DWB, 
-                        Accelerometer, RawAccelerometer};
+use iis3dwb::{Config as IIS3DWBConfig, IIS3DWB, Accelerometer};
 use nrf52840_hal::pac::interrupt;
 
 use core::cell::RefCell;
-use core::ops::DerefMut;
 use cortex_m::interrupt::Mutex;
 static G_GPIOTE: Mutex<RefCell<Option<nrf52840_hal::gpiote::Gpiote>>> = Mutex::new(RefCell::new(None));
 
@@ -45,7 +46,7 @@ pub fn exit() -> ! {
 
 #[interrupt]
 fn GPIOTE (){
-    debug!("in!");
+    debug!("Inside IRQ!");
     cortex_m::interrupt::free(|cs| {
                                 let gpiote = G_GPIOTE.borrow(cs).borrow();
                                 if let Some(gpiote) = gpiote.as_ref(){
@@ -58,7 +59,6 @@ fn GPIOTE (){
 fn main() -> ! {
     info!("running!");
     let p = nrf52840_hal::pac::Peripherals::take().unwrap();
-    let mut core = nrf52840_hal::pac::CorePeripherals::take().unwrap();
     let port0 = p0::Parts::new(p.P0);
     let ncs = port0.p0_14.into_push_pull_output(Level::High);
     let mut heartbeat = port0.p0_00.into_push_pull_output(Level::High);
@@ -87,7 +87,7 @@ fn main() -> ! {
         mosi: Some(spimosi),
     };
     
-    let mut spi =   Spim::new(
+    let spi =   Spim::new(
         p.SPIM3,
         spi_pins,
         nrf52840_hal::spim::Frequency::M1,
@@ -96,10 +96,11 @@ fn main() -> ! {
     );
 
     let mut acc_cfg = IIS3DWBConfig::default();
-    let mut irqs = acc_cfg.interrupt1.cfg;
-    irqs.AccDataReady = true;
+    acc_cfg.interrupt1.cfg.AccDataReady = true;
 
     let mut accelerometer = IIS3DWB::new(spi, ncs, &acc_cfg).unwrap();
+    accelerometer.disable_all_interrupts();
+
     let id = accelerometer.get_device_id();
     defmt::info!("The device ID is: 0x{=u8:x}", id);
     // let temp = accelerometer.read_temp_raw();
