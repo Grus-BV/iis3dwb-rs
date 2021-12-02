@@ -72,6 +72,7 @@ nrf52840-hal = {version = "0.14.0",features = ["rt"] }
 embedded-hal    = "0.2.6"
 cortex-m        = { version = "0.7.2" }
 cortex-m-rt = "0.7.0"
+cortex-m-rtic = "0.5"
 
 [[example]]   
 name = 'nrf52dk'
