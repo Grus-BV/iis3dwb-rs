@@ -105,6 +105,7 @@ fn main() -> ! {
     // let temp = accelerometer.read_temp_raw();
     // defmt::info!("The device temperature is: 0x{=u16:x}", temp);
     accelerometer.start();
+    accelerometer.enable_drdy();
     accelerometer.enable_all_interrupts();
     accelerometer.accel_norm().unwrap();
     loop {
