@@ -5,6 +5,7 @@
 
 use crate::register::*;
 use crate::{IIS3DWB, spi, OutputPin};
+use defmt::debug;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
@@ -44,7 +45,7 @@ impl InterruptConfigSrc1 {
             BDRCounter: false,
         }
     }
-    pub const fn from_raw(val:u8)-> Self{
+    pub fn from_raw(val:u8)-> Self{
         let mut self_init = InterruptConfigSrc1::none();
         if val & InterruptSource1::BDRCounter.raw() > 0 {self_init.BDRCounter = true;}
         if val & InterruptSource1::FifoFull.raw() > 0 {self_init.FifoFull = true;}
@@ -54,7 +55,7 @@ impl InterruptConfigSrc1 {
         if val & InterruptSource1::AccDataReady.raw() > 0 {self_init.AccDataReady = true;}
         self_init
     }
-    pub const fn raw(self) -> u8 {
+    pub fn raw(self) -> u8 {
         let mut iters = 0u8;
         if self.AccDataReady {iters += InterruptSource1::AccDataReady.raw()};
         if self.BootStatus {iters += InterruptSource1::BootStatus.raw()};
@@ -62,6 +63,7 @@ impl InterruptConfigSrc1 {
         if self.FifoOverrun {iters += InterruptSource1::FifoOverrun.raw()};
         if self.FifoFull {iters += InterruptSource1::FifoFull.raw()};
         if self.BDRCounter {iters += InterruptSource1::BDRCounter.raw()};
+        defmt::debug!("ints: {=u8:#010b}", iters);
         iters
     }
 }
@@ -87,17 +89,19 @@ where
     SPI: spi::Transfer<u8, Error=E> + spi::Write<u8, Error=E>,
     CS: OutputPin <Error= PinError>
 {
-    pub fn set_interrupt_1 (&mut self, int1: Interrupt1) -> Result<(),E> {
+    pub fn set_interrupt_1 (&mut self, int1: Interrupt1) {
         let requested_ints_cfg = int1.cfg.raw();
         self.write_reg(Register::INT1_CTRL.addr(), requested_ints_cfg);
-        Ok(())
     } 
 
     /// We are enabling all interrupts here, TODO, .
     pub fn enable_all_interrupts(&mut self){
         self.write_reg(Register::INTERRUPTS_EN.addr(), INTERRUPTS_EN);
     }
-
+    
+    pub fn enable_drdy (&mut self){
+        self.write_reg(Register::CTRL4_C.addr(), DRDY_MASK);
+    }
     pub fn on_irq1(&mut self){
         //TODO handle irq.
     }
