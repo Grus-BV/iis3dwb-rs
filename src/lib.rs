@@ -32,6 +32,7 @@ use core::fmt::Debug;
 const SPI_READ: u8 = 0b1000_0000;
 const SPI_WRITE: u8 = 0x0000_0000;
 
+
 pub struct Config {
     pub mode: Mode,
     pub datarate: DataRate,

@@ -7,20 +7,14 @@ use cortex_m_rt::entry;
 use defmt::*;
 use defmt::panic;
 use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::digital::v2::InputPin;
 use embedded_hal::blocking::spi::*;
-use nrf52840_hal:: {gpio,
-                    spim,
-                    gpio::p0,   
-                    gpio::Level,
-                    gpio::{Input,PullDown,Pin},
-                    gpiote::*,
-                    Spim,
-                    pac::CLOCK,
-                    };
+use nrf52840_hal:: {Spim, gpio, gpio::Level, gpio::p0, gpio::{Input,PullDown,Pin}, gpiote::*, pac::{CLOCK, SPIM3}, spim};
 
 use iis3dwb::{Config as IIS3DWBConfig, Range, IIS3DWB, 
-                        Accelerometer, RawAccelerometer};
+                        Accelerometer, RawAccelerometer,Error};
 use nrf52840_hal::pac::interrupt;
+use core::fmt::{self, Debug, Display};
 
 use panic_probe as _;
 #[defmt::panic_handler]
@@ -33,20 +27,20 @@ pub fn exit() -> ! {
         cortex_m::asm::bkpt();
     }
 }
-
+#[derive(Debug)]
+pub enum DummyError {}
 
 #[rtic::app(device = nrf52840_hal::pac, peripherals = true, monotonic = rtic::cyccnt::CYCCNT)]
 const APP: () = {
     struct Resources {
         gpiote: Gpiote,
         int1: Pin<Input<PullDown>>,
-        accelerometer: Accelerometer,
+        accelerometer: IIS3DWB<Spim<SPIM3>, OutputPin<Error=>>,
     }
 
     #[init]
     fn init(mut ctx: init::Context) -> init::LateResources {
         info!("running!");
-        let _clocks = hal::clocks::Clocks::new(ctx.device.CLOCK).enable_ext_hfosc();
         let port0 = p0::Parts::new(ctx.device.P0);
         let ncs = port0.p0_14.into_push_pull_output(Level::High);
         let mut heartbeat = port0.p0_24.into_push_pull_output(Level::High);
@@ -69,7 +63,7 @@ const APP: () = {
         };
         
         let mut spi =   Spim::new(
-            p.SPIM3,
+            ctx.device.SPIM3,
             spi_pins,
             nrf52840_hal::spim::Frequency::K125,
             nrf52840_hal::spim::MODE_3, 
@@ -90,10 +84,7 @@ const APP: () = {
         accelerometer.enable_all_interrupts();
 
         let mut acc  = accelerometer.accel_norm().unwrap();
-                
-        ctx.core.DCB.enable_trace();
-        ctx.core.DWT.enable_cycle_counter();
-        
+
         init::LateResources {
             gpiote,
             int1,
@@ -108,12 +99,15 @@ const APP: () = {
         }
     }
 
-    #[task(resources = [gpiote, int1])]
+    #[task(binds = GPIOTE, resources = [gpiote, int1])]
     fn irq_service(ctx: irq_service::Context) {
         let accelerometer_irqd = ctx.resources.int1.is_low().unwrap();
         if accelerometer_irqd {
-            rprintln!("New data!");
+            defmt::info!("New data!");
         }
+    }
+    extern "C" {
+        fn SWI0_EGU0();
     }
 };
 
