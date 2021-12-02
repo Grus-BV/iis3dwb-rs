@@ -9,7 +9,7 @@ use defmt::panic;
 use embedded_hal::digital::v2::OutputPin;
 use embedded_hal::digital::v2::InputPin;
 use embedded_hal::blocking::spi::*;
-use nrf52840_hal:: {Spim, gpio, gpio::Level, gpio::p0, gpio::{Input,PullDown,Pin}, gpiote::*, pac::{CLOCK, SPIM3}, spim};
+use nrf52840_hal:: {Spim, gpio, gpio::Level, gpio::p0, gpio::{Input,PullDown,PushPull,Output,Pin}, gpiote::*, pac::{CLOCK, SPIM3}, spim};
 
 use iis3dwb::{Config as IIS3DWBConfig, Range, IIS3DWB, 
                         Accelerometer, RawAccelerometer,Error};
@@ -35,14 +35,14 @@ const APP: () = {
     struct Resources {
         gpiote: Gpiote,
         int1: Pin<Input<PullDown>>,
-        accelerometer: IIS3DWB<Spim<SPIM3>, OutputPin<Error=>>,
+        accelerometer: IIS3DWB<Spim<SPIM3>, Pin<Output<PushPull>>>,
     }
 
     #[init]
     fn init(mut ctx: init::Context) -> init::LateResources {
         info!("running!");
         let port0 = p0::Parts::new(ctx.device.P0);
-        let ncs = port0.p0_14.into_push_pull_output(Level::High);
+        let ncs = port0.p0_14.into_push_pull_output(Level::High).degrade();
         let mut heartbeat = port0.p0_24.into_push_pull_output(Level::High);
         let spiclk = port0.p0_13.into_push_pull_output(Level::Low).degrade();
         let spimiso = port0.p0_15.into_floating_input().degrade();
@@ -82,6 +82,7 @@ const APP: () = {
         accelerometer.start();
         accelerometer.enable_drdy();
         accelerometer.enable_all_interrupts();
+        accelerometer.accel_raw();
 
         let mut acc  = accelerometer.accel_norm().unwrap();
 
@@ -99,12 +100,15 @@ const APP: () = {
         }
     }
 
-    #[task(binds = GPIOTE, resources = [gpiote, int1])]
+    #[task(binds = GPIOTE, resources = [gpiote, int1,accelerometer])]
     fn irq_service(ctx: irq_service::Context) {
         let accelerometer_irqd = ctx.resources.int1.is_low().unwrap();
         if accelerometer_irqd {
             defmt::info!("New data!");
         }
+        ctx.resources.accelerometer.accel_raw();
+        defmt::info!("IRQ!");
+        ctx.resources.gpiote.reset_events();
     }
     extern "C" {
         fn SWI0_EGU0();
