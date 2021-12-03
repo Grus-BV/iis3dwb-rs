@@ -9,6 +9,7 @@ use defmt::panic;
 use embedded_hal::digital::v2::OutputPin;
 use embedded_hal::digital::v2::InputPin;
 use embedded_hal::blocking::spi::*;
+use iis3dwb::F32x3;
 use nrf52840_hal:: {Spim, gpio, gpio::Level, gpio::p0, gpio::{Input,PullDown,PushPull,Output,Pin}, gpiote::*, pac::{CLOCK, SPIM3}, spim};
 
 use iis3dwb::{Config as IIS3DWBConfig, Range, IIS3DWB, 
@@ -36,6 +37,7 @@ const APP: () = {
         gpiote: Gpiote,
         int1: Pin<Input<PullDown>>,
         accelerometer: IIS3DWB<Spim<SPIM3>, Pin<Output<PushPull>>>,
+        counter: u16
     }
 
     #[init]
@@ -65,7 +67,7 @@ const APP: () = {
         let mut spi =   Spim::new(
             ctx.device.SPIM3,
             spi_pins,
-            nrf52840_hal::spim::Frequency::K125,
+            nrf52840_hal::spim::Frequency::M8,
             nrf52840_hal::spim::MODE_3, 
             0
         );
@@ -85,11 +87,12 @@ const APP: () = {
         accelerometer.accel_raw();
 
         let mut acc  = accelerometer.accel_norm().unwrap();
-
+        let mut counter = 0u16;
         init::LateResources {
             gpiote,
             int1,
             accelerometer,
+            counter,
         }
     }
 
@@ -100,15 +103,19 @@ const APP: () = {
         }
     }
 
-    #[task(binds = GPIOTE, resources = [gpiote, int1,accelerometer])]
+    #[task(binds = GPIOTE, resources = [gpiote, int1, accelerometer,counter])]
     fn irq_service(ctx: irq_service::Context) {
+        ctx.resources.gpiote.reset_events();
         let accelerometer_irqd = ctx.resources.int1.is_low().unwrap();
         if accelerometer_irqd {
             defmt::info!("New data!");
         }
-        ctx.resources.accelerometer.accel_raw();
-        defmt::info!("IRQ!");
-        ctx.resources.gpiote.reset_events();
+        let accel = ctx.resources.accelerometer.accel_norm().unwrap();
+        *ctx.resources.counter += 1;
+        if *ctx.resources.counter > 100{
+            defmt::info!("IRQ!, {},{},{}",accel.x, accel.y, accel.z );
+            *ctx.resources.counter = 0u16;
+        }
     }
     extern "C" {
         fn SWI0_EGU0();
