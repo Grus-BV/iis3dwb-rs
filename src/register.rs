@@ -306,6 +306,19 @@ pub enum Mode {
     LowPower,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u8)]
+pub enum FifoDecimation {
+    OmitTimestamp = 0b00,
+    Decimation1 = 0b01,
+    Decimation8 = 0b10,
+    Decimation32 = 0b11,
+}
+
+
+
+
+
 // === WHO_AMI_I (0Fh) ===
 
 /// `WHO_AM_I` device identification register
