@@ -174,11 +174,8 @@ impl Threshold {
     pub fn mg(range: Range, mgs: f32) -> Self {
         let value = mgs / (range.as_mg() as f32);
         let truncated = value as u64;
-
         let round_up = value - (truncated as f32) > 0.5;
-
-        let result = if round_up { truncated + 1 } else { truncated };
-
+        let result = if round_up { truncated + 1 } else { truncated }; 
         Threshold(result as u8)
     }
 }
@@ -362,4 +359,18 @@ pub const TIMESTAMP_EN: u8 = 0b00100000;
 
 // === INTERRUPTS_EN (58h) ===
 pub const INTERRUPTS_EN: u8 = 0b1000_0000;
+
+// === FIFO_CTRL4 (0Ah) ===
+pub const FIFO_MODE_MASK: u8 = 0b0000_0111;
+pub const DEC_TS_MASK: u8 = 0b0011_0000;
+pub const ODR_T_MASK: u8 = 0b1100_0000;
+
+// === FIFO_CTRL3 (0Ah) ===
+pub const BDR_XL_MASK: u8 = 0b0000_1111;
+
+
+// === FIFO_CTRL2 (0Ah) ===
+pub const STOP_ON_WTM: u8 = 0b1000_0000;
+pub const WTM8: u8 = 0b0000_0001;
+
 

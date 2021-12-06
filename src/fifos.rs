@@ -1,5 +1,5 @@
 use crate::register::*;
-
+use crate::{IIS3DWB, spi, OutputPin};
 
 // 
 // In IIS3DWB, Interrupts are distinct from Wake up sources
@@ -15,11 +15,35 @@ pub struct Watermark{
 
 // Cannot be higher than the FIFO size, 3000 bytes.
 impl Watermark {
-    pub fn from_bytes(watermark_input: u16){
-        
+    pub fn from_bytes(watermark_u16: u16){
+        self.lsb =  watermark_u16 as u8;
+        self.hsb = (watermark_u16 >> 16) as bool;
     }
 }
 
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u8)]
+pub enum FifoTimestampDecimation {
+    Omitted = 0b00,
+    Decimation1 = 0b01,
+    Decimation8 = 0b10,
+    Decimation32 = 0b11,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u8)]
+pub enum FifoAccBatchDataRate {
+    Omitted = 0b0000,
+    BDR26667Hz = 0b1010,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u8)]
+pub enum FifoTempBatchDataRate {
+    Omitted = 0b00,
+    BDR104Hz   = 0b11,
+}
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, TryFromPrimitive)]
 #[repr(u8)]
@@ -31,30 +55,84 @@ pub enum FifoMode{
     Continuous = 0b110,
     BypassToFifo = 0b111,
 }
+impl FifoMode {
+    pub const fn raw(self) -> u8 {
+        self as u8
+    }
+ }
+
 
 #[derive(Debug, Copy, Clone)]
-pub struct Fifo
+pub struct FifoConfig
 {
-    enabled: bool,
     mode: FifoMode,
     watermark:Watermark,
     stop_in_watermark: bool,
+    temperature: FifoTempBatchDataRate,
+    timestamp: FifoTimeStampDecimation,
+    acceleration: FifoAccBatchDataRate
 }
 
-impl Default for Fifo {
+impl Default for FifoConfig {
     fn default() -> Self {
         Self{
-            enabled:false,
             mode: FifoMode::Disabled,
             watermark:0,
             stop_in_watermark:false,
+            temperature: FifoTempBatchDataRate::Omitted,
+            timestamp: FifoTimeStampDecimation::Omitted,
+            acceleration: FifoAccBatchDataRate::Omitted,
         }
     }
 }
 
-impl Fifo {
-    
-   
+impl FifoConfig {
+    fn as_registers(&self) -> [u8;4] {
+        let mut registers = [0;4];
+        registers[0] = watermark.lsb();
+        registers[1] = watermark.hsb() & FIFO_WTM8 + 
+                       stop_in_watermark as u8 & STOP_ON_WTM << 7;
+        registers[2] = self.acceleration as u8;
+        registers[3] = self.mode as u8 & FIFO_MODE_MASK +
+                       (self.temperature as u8 & ODR_T_MASK) << 4;
+                       (self.timestamp as u8 & DEC_TS_MASK) << 6;
+        registers
+    }
+    fn from_registers(&self, registers: &[u8;4]) {
+    }
 }
 
 
+impl <SPI,CS,E,PinError> IIS3DWB <SPI,CS>
+where 
+    SPI: spi::Transfer<u8,Error> + spi::Write<u8,Error=E>,
+    CS: OutputPin <Error= PinError>
+{
+    pub fn configure_fifo(&mut self, config: Fifo){
+
+    }
+    pub fn get_config(&self) -> FifoConfig{
+        
+    }
+    pub fn set_fifo_mode(&mut self, mode: FifoMode){
+        self.modify_register(Register::FIFO_CTRL_4, FIFO_MODE, mode.raw());
+    }
+    pub fn set_watermark(&mut self, watermark:Watermark){
+        self.write_reg(Register::FIFO_CTRL_1, watermark.lsb());
+        self.modify_register(Register::FIFO_CTRL_2, FIFO_WTM8, watermark.hsb());   
+    }
+    pub fn flush_fifo(&mut self){
+       // changes mode to Bypass 
+    }
+    pub fn unread_data_count(&self) -> u16 {
+        // fifo status 1 and 2 
+    }
+    pub fn watermark_exceeded(&self) -> bool {
+        // fifo status 1
+    }
+    pub fn overrun(&self) -> bool {
+        // fifo status 1
+    }
+
+
+} 
