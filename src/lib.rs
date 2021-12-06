@@ -3,6 +3,7 @@
 mod register;
 mod interrupts;
 mod wakeups;
+mod fifos;   
 
 /// Is there a way to improve this to non blocking? Does that require async? 
 pub use embedded_hal::blocking::spi;
@@ -17,6 +18,12 @@ pub use accelerometer::{
     vector::{I16x3,F32x3,I32x3}
 };
 
+use fifos::{FifoConfig};
+pub use fifos::{FifoAccBatchDataRate,
+                FifoMode,
+                FifoTempBatchDataRate,
+                FifoTimestampDecimation,
+                Watermark};
 // use interrupts::{Interrupt1, Interrupt2};
 // use wakeups::{WakeUp};
 pub use register::{ DataRate, Mode, Range, Register,
@@ -41,6 +48,7 @@ pub struct Config {
     pub enable_temp:bool,
     pub range: Range,
     pub interrupt1: Interrupt1,
+    pub fifo: FifoConfig,
     // pub interrupt2: Range,
     // pub wake_up: WakeUp,
 }
@@ -56,6 +64,7 @@ impl Default for Config{
             enable_temp: true,
             range: Range::G2,
             interrupt1: Interrupt1::default(),
+            fifo: FifoConfig::default(),
             // interrupt2: Interrupt2::None,
             // wake_up: WakeUp::None,
         }
@@ -69,6 +78,7 @@ pub struct IIS3DWB <SPI, CS>{
     // configuration 
     range : Range,
     interrupt1: Interrupt1,
+    fifo: FifoConfig,
     // interrupt2: Interrupt2,
     // wake_up: WakeUp,
 }
@@ -85,6 +95,7 @@ where
             cs, 
             range: config.range,
             interrupt1: config.interrupt1,
+            fifo: config.fifo,
             // interrupt2: config.interrupt2,
             // wake_up: config.wake_up
         };

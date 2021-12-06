@@ -371,6 +371,6 @@ pub const BDR_XL_MASK: u8 = 0b0000_1111;
 
 // === FIFO_CTRL2 (0Ah) ===
 pub const STOP_ON_WTM: u8 = 0b1000_0000;
-pub const WTM8: u8 = 0b0000_0001;
+pub const FIFO_WTM8: u8 = 0b0000_0001;
 
 

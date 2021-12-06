@@ -17,7 +17,12 @@ use nrf52840_hal:: {gpio,
                     };
 
 use iis3dwb::{Config as IIS3DWBConfig, Range, IIS3DWB, 
-                        Accelerometer, RawAccelerometer};
+                        Accelerometer, RawAccelerometer,
+                        FifoAccBatchDataRate,
+                        FifoMode,
+                        FifoTempBatchDataRate,
+                        FifoTimestampDecimation,
+                        Watermark};
 
 
 use panic_probe as _;
@@ -60,20 +65,24 @@ fn main() -> ! {
 
     let mut acc_cfg = IIS3DWBConfig::default();
 
+    acc_cfg.fifo.mode = FifoMode::FifoMode;
+    acc_cfg.fifo.temperature = FifoTempBatchDataRate::BDR104Hz;
+    acc_cfg.fifo.timestamp = FifoTimestampDecimation::Decimation1;
+    acc_cfg.fifo.acceleration = FifoAccBatchDataRate::BDR26667Hz;
+    acc_cfg.fifo.watermark = Watermark::from_bytes(0xFF);
     let mut accelerometer = IIS3DWB::new(spi, ncs, &acc_cfg).unwrap();
     let id = accelerometer.get_device_id();
     defmt::info!("The device ID is: 0x{=u8:x}", id);
     // let temp = accelerometer.read_temp_raw();
     // defmt::info!("The device temperature is: 0x{=u16:x}", temp);
 
+
     accelerometer.start();
     accelerometer.set_timestamp_en(true);
+    accelerometer.accel_raw();
     loop{
-        cortex_m::asm::delay(50_000_000);   // KISS.
-        let mut acc  = accelerometer.accel_norm().unwrap();
-        let mut odr  = accelerometer.sample_rate().unwrap();
-        let mut tstamp   = accelerometer.get_timestamp_raw();
-        defmt::info!("{} gs,{} gs,{} gs,{} Hz,{} us",acc.x,acc.y,acc.z,odr,tstamp);
+        cortex_m::asm::delay(5000000);   // KISS.
+        defmt::info!("{}",accelerometer.unread_data_count());
     }
 
     exit();
