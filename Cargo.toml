@@ -14,10 +14,11 @@ keywords = [
     "embedded-hal-driver",
     "accelerometer",
 ]
-repository = "https://github.com/mehmetalianil/iis3dwb-rs"
+repository = "https://github.com/Grus-BV/iis3dwb-rs"
 edition = "2018"
 
 [features]
+board_alpha = []
 # set logging levels here
 default = [
 ]
@@ -76,3 +77,4 @@ cortex-m-rtic = "0.5"
 
 [[example]]   
 name = 'nrf52dk'
+

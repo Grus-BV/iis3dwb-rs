@@ -113,7 +113,7 @@ where
 {
     pub fn configure_fifo(&mut self, config: FifoConfig){
         let registers = config.as_registers();
-        self.write(Register::FIFO_CTRL_1.addr(),registers); //TODOTODO
+        //self.write_reg(Register::FIFO_CTRL_1.addr(),registers); //TODOTODO
     }
     pub fn get_config(&self) -> FifoConfig{
         todo!();        

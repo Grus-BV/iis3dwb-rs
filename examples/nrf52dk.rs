@@ -9,9 +9,12 @@ use cortex_m_rt::entry;
 use defmt::*;
 use defmt::panic;
 use embedded_hal::blocking::spi::*;
+use embedded_hal::digital::v2::InputPin;
+use embedded_hal::digital::v2::OutputPin;
 use nrf52840_hal:: {gpio,
                     spim,
-                    gpio::p0,   
+                    gpio::p0,
+                    gpio::p1,   
                     gpio::Level,
                     Spim,
                     };
@@ -39,10 +42,21 @@ fn main() -> ! {
 
     let p = nrf52840_hal::pac::Peripherals::take().unwrap();
     let port0 = p0::Parts::new(p.P0);
+    let port1 = p1::Parts::new(p.P1);
+    let mut led1 = port1.p1_02.into_push_pull_output(Level::Low);
+    let mut led2 = port1.p1_04.into_push_pull_output(Level::Low);
+    let mut led3 = port1.p1_06.into_push_pull_output(Level::Low);
     let ncs = port0.p0_14.into_push_pull_output(Level::High);
     let spiclk = port0.p0_13.into_push_pull_output(Level::Low).degrade();
+  
+    #[cfg (not(feature = "board_alpha"))]
     let spimiso = port0.p0_15.into_floating_input().degrade();
+    #[cfg (not(feature = "board_alpha"))]
     let spimosi = port0.p0_16.into_push_pull_output(Level::Low).degrade();
+    #[cfg (feature = "board_alpha")]
+    let spimiso = port0.p0_16.into_floating_input().degrade();
+    #[cfg (feature = "board_alpha")]
+    let spimosi = port0.p0_15.into_push_pull_output(Level::Low).degrade();
 
     let spi_pins = nrf52840_hal::spim::Pins {
         sck: spiclk,
@@ -69,11 +83,22 @@ fn main() -> ! {
     accelerometer.start();
     accelerometer.set_timestamp_en(true);
     loop{
-        cortex_m::asm::delay(50_000_000);   // KISS.
+        led1.set_high().unwrap();
+        led2.set_low().unwrap();
+        led3.set_low().unwrap();
+        cortex_m::asm::delay(25_000_000);   // KISS.
+        led1.set_low().unwrap();
+        led2.set_high().unwrap();
+        led3.set_low().unwrap();
+        cortex_m::asm::delay(25_000_000);   // KISS.
+        led1.set_low().unwrap();
+        led2.set_low().unwrap();
+        led3.set_high().unwrap();
+        cortex_m::asm::delay(25_000_000);   // KISS.
         let mut acc  = accelerometer.accel_norm().unwrap();
         let mut odr  = accelerometer.sample_rate().unwrap();
-        let mut tstamp   = accelerometer.get_timestamp_raw();
-        defmt::info!("{} gs,{} gs,{} gs,{} Hz,{} us",acc.x,acc.y,acc.z,odr,tstamp);
+        let mut tstamp   = accelerometer.get_timestamp();
+        defmt::info!("{} gs,{} gs,{} gs,{} Hz,{} us",acc.x,acc.y,acc.z,odr,tstamp.us(accelerometer.get_odr()));
     }
 
     exit();

@@ -114,6 +114,12 @@ where
         self.modify_register( Register::CTRL1_XL.addr(), 
                              XL_EN_MASK, 
                               0b101).unwrap();
+    }  
+
+    pub fn stop(&mut self) {
+        self.modify_register( Register::CTRL1_XL.addr(), 
+                             XL_EN_MASK, 
+                              0b000).unwrap();
     }
 
     pub fn set_range(&mut self, range: Range) {
