@@ -105,7 +105,7 @@ where
             // raise
         }
         // set_range
-        iis3dwb.set_range(iis3dwb.range);
+        //iis3dwb.set_range(iis3dwb.range);
 
         /// FIX
         /// Setting this register results in high current usage. 
