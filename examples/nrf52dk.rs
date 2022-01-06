@@ -50,7 +50,7 @@ fn main() -> ! {
     let spiclk = port0.p0_13.into_push_pull_output(Level::Low).degrade();
   
     #[cfg (not(feature = "board_alpha"))]
-    let spimiso = port0.p0_15.into_floating_input().degrade();
+    let spimiso = port0.p0_15.into_pullup_input().degrade();
     #[cfg (not(feature = "board_alpha"))]
     let spimosi = port0.p0_16.into_push_pull_output(Level::Low).degrade();
     #[cfg (feature = "board_alpha")]
@@ -83,17 +83,7 @@ fn main() -> ! {
     accelerometer.start();
     accelerometer.set_timestamp_en(true);
     loop{
-        led1.set_high().unwrap();
-        led2.set_low().unwrap();
-        led3.set_low().unwrap();
         cortex_m::asm::delay(25_000_000);   // KISS.
-        led1.set_low().unwrap();
-        led2.set_high().unwrap();
-        led3.set_low().unwrap();
-        cortex_m::asm::delay(25_000_000);   // KISS.
-        led1.set_low().unwrap();
-        led2.set_low().unwrap();
-        led3.set_high().unwrap();
         cortex_m::asm::delay(25_000_000);   // KISS.
         let mut acc  = accelerometer.accel_norm().unwrap();
         let mut odr  = accelerometer.sample_rate().unwrap();
