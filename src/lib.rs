@@ -106,7 +106,10 @@ where
         }
         // set_range
         iis3dwb.set_range(iis3dwb.range);
-        //iis3dwb.set_interrupt_1(iis3dwb.interrupt1);
+
+        /// FIX
+        /// Setting this register results in high current usage. 
+        // iis3dwb.set_interrupt_1(iis3dwb.interrupt1);
         Ok(iis3dwb)
     }  
 
