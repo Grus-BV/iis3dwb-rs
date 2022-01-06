@@ -100,10 +100,10 @@ where
             // wake_up: config.wake_up
         };
 
-        let id= iis3dwb.get_device_id();
-        if id != DEVICE_ID {
-            // raise
-        }
+        // let id= iis3dwb.get_device_id();
+        // if id != DEVICE_ID {
+        //     // raise
+        // }
         // set_range
         //iis3dwb.set_range(iis3dwb.range);
 
