@@ -105,7 +105,7 @@ where
             // raise
         }
         // set_range
-        //iis3dwb.set_range(iis3dwb.range);
+        iis3dwb.set_range(iis3dwb.range);
         //iis3dwb.set_interrupt_1(iis3dwb.interrupt1);
         Ok(iis3dwb)
     }  
