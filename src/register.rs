@@ -327,8 +327,8 @@ pub const SW_RESET: u8 = 0b0000_0001;
 // === CTRL4_C (13h) ===
 pub const INT2_ON_INT1: u8 = 0b0010_0000;
 pub const DRDY_MASK: u8 = 0b0000_1000;
-pub const I2C_DISABLE: u8 = 0b0000_0000;
-pub const ONE_AX_TO_3REGOUT: u8 = 0b0000_0000; //Actual name 1AX_TO_3REGOUT 
+pub const I2C_DISABLE: u8 = 0b0000_0100;
+pub const ONE_AX_TO_3REGOUT: u8 = 0b0000_0001; //Actual name 1AX_TO_3REGOUT 
 
 // === CTRL5_C (14h) ===
 

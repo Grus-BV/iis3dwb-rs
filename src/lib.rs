@@ -15,8 +15,12 @@ pub use accelerometer::{
     RawAccelerometer,
     error,
     Error,
-    vector::{I16x3,F32x3,I32x3}
+    vector::{I16x3,F32x3,I32x3},
+    Vector,
 };
+use core::ops::Index;
+use micromath::generic_array::{arr, typenum::U3, GenericArray};
+
 
 use fifos::{FifoConfig};
 pub use fifos::{FifoAccBatchDataRate,
@@ -24,6 +28,7 @@ pub use fifos::{FifoAccBatchDataRate,
                 FifoTempBatchDataRate,
                 FifoTimestampDecimation,
                 Watermark};
+use nrf52840_hal::Timer;
 // use interrupts::{Interrupt1, Interrupt2};
 // use wakeups::{WakeUp};
 pub use register::{ DataRate, Mode, Range, Register,
@@ -31,7 +36,9 @@ pub use register::{ DataRate, Mode, Range, Register,
 use register::{DEVICE_ID,
                XL_EN_MASK,
                FS_EN_MASK,
-               TIMESTAMP_EN,};
+               TIMESTAMP_EN,
+               SW_RESET,
+               I2C_DISABLE};
 
 use core::fmt::Debug;
 
@@ -100,16 +107,13 @@ where
             // wake_up: config.wake_up
         };
 
-        // let id= iis3dwb.get_device_id();
-        // if id != DEVICE_ID {
-        //     // raise
-        // }
-        // set_range
-        //iis3dwb.set_range(iis3dwb.range);
+        let id= iis3dwb.get_device_id();
+        if id != DEVICE_ID {
+            // raise
+        }
+        iis3dwb.set_range(iis3dwb.range);
 
-        /// FIX
-        /// Setting this register results in high current usage. 
-        // iis3dwb.set_interrupt_1(iis3dwb.interrupt1);
+        iis3dwb.set_interrupt_1(iis3dwb.interrupt1);
         Ok(iis3dwb)
     }  
 
@@ -124,11 +128,29 @@ where
                              XL_EN_MASK, 
                               0b000).unwrap();
     }
+    
+    pub fn reset(&mut self) {
+        self.modify_register( Register::CTRL3_C.addr(), 
+                            SW_RESET, 
+                            SW_RESET).unwrap();        
+    }    
+
+    pub fn resetting(&mut self) -> bool {
+        let mut result = [1u8];
+        self.read_reg(Register::CTRL3_C.addr(), &mut result);
+        result[0] & SW_RESET == 1
+    }
 
     pub fn set_range(&mut self, range: Range) {
         self.modify_register( Register::CTRL1_XL.addr(), 
                               FS_EN_MASK, 
                               range.bits()).unwrap();
+    }
+
+    pub fn disable_i2c(&mut self) {
+        self.modify_register( Register::CTRL4_C.addr(), 
+                            I2C_DISABLE, 
+                            I2C_DISABLE).unwrap();
     }
 
     /// Get the device ID
@@ -297,7 +319,7 @@ where
 
     fn accel_norm(&mut self) -> Result<F32x3, Error<Self::Error>> {
 
-        let raw_values = self.accel_raw().unwrap();
+        let raw_values: I16x3 = self.accel_raw().unwrap();
         let norm_values: F32x3 = F32x3::new(raw_values[0] as f32 *0.061 / 1000.0,
                                             raw_values[1] as f32 *0.061 / 1000.0,
                                             raw_values[2] as f32 *0.061 / 1000.0);
@@ -305,5 +327,96 @@ where
     }
     fn sample_rate(&mut self) -> Result<f32, Error<Self::Error>> {
         Ok(self.get_odr().hz())
+    }
+}
+
+#[doc="This is a clone of I16x3 implementation of Vector in the accelerometer crate"]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
+struct TimestampedAcceleration {
+    x:i16,
+    y:i16,
+    z:i16,
+    t:Option<Timestamp>,
+}
+
+impl TimestampedAcceleration {
+    /// Instantiate from X,Y,Z,T components
+    pub fn new(x: i16, y: i16, z: i16, t: Option<Timestamp>) -> Self {
+        TimestampedAcceleration { x, y, z, t }
+    }
+}
+
+/// This omits timestamp, since it is not of the same type
+impl Index<usize> for TimestampedAcceleration {
+    type Output = i16;
+
+    fn index(&self, i: usize) -> &i16 {
+        match i {
+            0 => &self.x,
+            1 => &self.y,
+            2 => &self.z,
+            _ => panic!("index out of range")
+        }
+    }
+}
+
+/// This might be cursed, since I need a type that I can use with RawAccelerometer,
+/// but optionally have the capability to reach the timestamp, if it is available. 
+impl Vector for TimestampedAcceleration {
+    type Component = i16;
+    type Axes = U3;
+
+    const MIN: i16 = core::i16::MIN;
+    const MAX: i16 = core::i16::MAX;
+
+    fn from_iter<I>(into_iter: I) -> Self
+    where
+        I: IntoIterator<Item = Self::Component>
+    {
+        let mut iter = into_iter.into_iter();
+
+        let x = iter.next().expect("no x-axis component in slice");
+        let y = iter.next().expect("no y-axis component in slice");
+        let z = iter.next().expect("no z-axis component in slice");
+        debug_assert!(iter.next().is_none(), "too many items in 3-axis component slice");
+
+        Self::new(x, y, z, None)
+    }
+
+    fn get(self, i: usize) -> Option<Self::Component> {
+        if i <= 2 {
+            Some(self[i])
+        } else {
+            None
+        }
+    }
+
+    fn to_array(self) -> GenericArray<i16, U3> {
+        arr![i16; self.x, self.y, self.z]
+    }
+
+}
+
+impl<SPI, CS, E, PinError> RawAccelerometer<TimestampedAcceleration> for IIS3DWB <SPI, CS>
+where
+    SPI: spi::Transfer<u8, Error=E> + spi::Write<u8, Error=E>,
+    CS: OutputPin<Error = PinError>,
+    E: Debug
+{
+    type Error = E;
+
+    fn accel_raw(&mut self) -> Result<TimestampedAcceleration, Error<E>> {
+        
+        let mut bytes = [0u8; 6+1];
+        bytes[0] = Register::OUTX_L_A.addr() | SPI_READ;
+        self.read(&mut bytes);
+
+        let x = (bytes[1] as u16 + (bytes[2] as u16) * 256 ) as i16;
+        let y = (bytes[3] as u16 + (bytes[4] as u16) * 256 ) as i16;
+        let z = (bytes[5] as u16 + (bytes[6] as u16) * 256 ) as i16;
+
+        let t = self.get_timestamp();
+        
+        Ok(TimestampedAcceleration::new(x, y, z, Some(t)))
     }
 }
