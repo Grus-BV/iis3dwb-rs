@@ -22,7 +22,8 @@ use iis3dwb::{Config as IIS3DWBConfig, Range, IIS3DWB,
                         FifoMode,
                         FifoTempBatchDataRate,
                         FifoTimestampDecimation,
-                        Watermark};
+                        Watermark,
+                        TimestampedAcceleration};
 
 
 use panic_probe as _;
@@ -46,8 +47,8 @@ fn main() -> ! {
     let port0 = p0::Parts::new(p.P0);
     let ncs = port0.p0_14.into_push_pull_output(Level::High);
     let spiclk = port0.p0_13.into_push_pull_output(Level::Low).degrade();
-    let spimiso = port0.p0_15.into_floating_input().degrade();
-    let spimosi = port0.p0_16.into_push_pull_output(Level::Low).degrade();
+    let spimiso = port0.p0_16.into_floating_input().degrade();
+    let spimosi = port0.p0_15.into_push_pull_output(Level::Low).degrade();
 
     let spi_pins = nrf52840_hal::spim::Pins {
         sck: spiclk,
@@ -58,7 +59,7 @@ fn main() -> ! {
     let mut spi =   Spim::new(
         p.SPIM3,
         spi_pins,
-        nrf52840_hal::spim::Frequency::M1,
+        nrf52840_hal::spim::Frequency::M32,
         nrf52840_hal::spim::MODE_3, 
         0
     );
@@ -76,15 +77,42 @@ fn main() -> ! {
     // let temp = accelerometer.read_temp_raw();
     // defmt::info!("The device temperature is: 0x{=u16:x}", temp);
 
+    accelerometer.stop();
+    cortex_m::asm::delay(5000000);   // KISS.
 
-    accelerometer.start();
     accelerometer.set_timestamp_en(true);
-    accelerometer.accel_raw();
-    loop{
-        cortex_m::asm::delay(5000000);   // KISS.
-        defmt::info!("{}",accelerometer.unread_data_count());
-    }
+    accelerometer.start();
 
+    accelerometer.set_fifo_mode(FifoMode::Disabled);
+    accelerometer.set_fifo_mode(FifoMode::FifoMode);
+
+    cortex_m::asm::delay(50000);   // KISS.
+    defmt::info!("FIFO Data 1: {}",accelerometer.unread_data_count());
+    cortex_m::asm::delay(50000);   // KISS.
+    defmt::info!("FIFO Data 2: {}",accelerometer.unread_data_count());
+    cortex_m::asm::delay(50000);   // KISS.
+    defmt::info!("FIFO Data 3: {}",accelerometer.unread_data_count());
+    cortex_m::asm::delay(50000);   // KISS.
+    defmt::info!("FIFO Data 4: {}",accelerometer.unread_data_count());
+    cortex_m::asm::delay(50000);   // KISS.
+    defmt::info!("FIFO Data 5: {}",accelerometer.unread_data_count());
+    cortex_m::asm::delay(50000);   // KISS.
+    defmt::info!("FIFO Data 6: {}",accelerometer.unread_data_count());
+    cortex_m::asm::delay(50000);   // KISS.
+    defmt::info!("FIFO Data 7: {}",accelerometer.unread_data_count());
+
+    let mut buffer = [0u8;700];
+    buffer = accelerometer.fifo_read();
+    
+    defmt::info!("FIFO First  700 reads: {=[u8]:x}",buffer);
+    defmt::info!("FIFO After 700 reads: {}",accelerometer.unread_data_count());
+    buffer = accelerometer.fifo_read();
+
+    defmt::info!("FIFO After another 700 reads: {}",accelerometer.unread_data_count());
+    defmt::info!("FIFO Last 700 reads: {=[u8]:x}",buffer);
+    
+    accelerometer.stop();
+   
     exit();
 }
 

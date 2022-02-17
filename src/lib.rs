@@ -38,12 +38,15 @@ use register::{DEVICE_ID,
                FS_EN_MASK,
                TIMESTAMP_EN,
                SW_RESET,
-               I2C_DISABLE};
+               I2C_DISABLE,
+               IF_INC,
+               ROUNDING_EN,
+            };
 
 use core::fmt::Debug;
 
 
-const SPI_READ: u8 = 0b1000_0000;
+pub const SPI_READ: u8 = 0b1000_0000;
 const SPI_WRITE: u8 = 0x0000_0000;
 
 pub struct Config {
@@ -106,13 +109,15 @@ where
             // interrupt2: config.interrupt2,
             // wake_up: config.wake_up
         };
-
+        
         let id= iis3dwb.get_device_id();
         if id != DEVICE_ID {
             // raise
         }
+        iis3dwb.set_if_increment(true);
         iis3dwb.set_range(iis3dwb.range);
-
+        iis3dwb.set_timestamp_en(true);
+        iis3dwb.configure_fifo(iis3dwb.fifo);
         iis3dwb.set_interrupt_1(iis3dwb.interrupt1);
         Ok(iis3dwb)
     }  
@@ -259,10 +264,26 @@ where
         Timestamp(tstamp_lsb as u32 + (tstamp_msb as u32 * 256 * 256))
     }
 
+    pub fn set_if_increment (&mut self, state: bool){
+        self.modify_register( Register::CTRL3_C.addr(), 
+                            IF_INC, state as u8).unwrap();
+    }
+
+    pub fn set_rounding (&mut self, state: bool){
+        self.modify_register( Register::CTRL5_C.addr(), 
+                            ROUNDING_EN, state as u8).unwrap();
+    }
+    
     pub fn set_timestamp_en (&mut self, state: bool){
         self.modify_register( Register::CTRL10_C.addr(), 
                             TIMESTAMP_EN, state as u8).unwrap();
     }
+    /// AN5444 states that writing 0xAA to TIMESTAMP2 resets the timestamp
+    pub fn reset_timestamp (&mut self){
+        self.modify_register( Register::TIMESTAMP2.addr(), 
+                            0xFF, 0xAA as u8).unwrap();
+    }
+    
     pub fn one_shot_acc(&mut self) -> (f32,f32,f32) {
         // TODO read multiple regs
         let mut bytes = [0u8; 6+1];
@@ -332,11 +353,11 @@ where
 
 #[doc="This is a clone of I16x3 implementation of Vector in the accelerometer crate"]
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
-struct TimestampedAcceleration {
-    x:i16,
-    y:i16,
-    z:i16,
-    t:Option<Timestamp>,
+pub struct TimestampedAcceleration {
+    pub x:i16,
+    pub y:i16,
+    pub z:i16,
+    pub t:Option<Timestamp>,
 }
 
 impl TimestampedAcceleration {

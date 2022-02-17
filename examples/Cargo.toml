@@ -1,0 +1,25 @@
+
+[patch.crates-io]
+embassy = { git = "https://github.com/embassy-rs/embassy" }
+embassy-nrf = {  git = "https://github.com/embassy-rs/embassy" }
+
+
+[dependencies]
+accelerometer = "~0.12"
+micromath = { version = '1', features = ['vector'] }
+num_enum = { version = "~0.5", default-features = false }
+defmt = "0.3.0"
+defmt-rtt = "0.3.0"
+panic-probe = { version = "0.3.0", features= ["print-defmt"] }
+nrf52840-hal = {version = "0.14.0",features = ["rt"] } 
+embedded-hal    = "0.2.6"
+cortex-m        = { version = "0.7.2" }
+cortex-m-rt = "0.7.0"
+cortex-m-rtic = "0.5"
+
+embassy = {version = "0.1.0", features = ["defmt"]}
+embassy-nrf = {version = "0.1.0", features = [ "defmt", "nrf52840", "time-driver-rtc1", "nightly"]}
+
+[[example]]   
+name = 'nrf52dk'
+
