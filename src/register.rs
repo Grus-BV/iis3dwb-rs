@@ -362,8 +362,8 @@ pub const INTERRUPTS_EN: u8 = 0b1000_0000;
 
 // === FIFO_CTRL4 (0Ah) ===
 pub const FIFO_MODE_MASK: u8 = 0b0000_0111;
-pub const DEC_TS_MASK: u8 = 0b0011_0000;
-pub const ODR_T_MASK: u8 = 0b1100_0000;
+pub const DEC_TS_MASK: u8 = 0b1100_0000;
+pub const ODR_T_MASK: u8 = 0b0011_0000;
 
 // === FIFO_CTRL3 (0Ah) ===
 pub const BDR_XL_MASK: u8 = 0b0000_1111;
