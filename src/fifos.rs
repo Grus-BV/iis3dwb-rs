@@ -98,7 +98,7 @@ impl FifoConfig {
         registers[1] = self.watermark.hsb as u8 & FIFO_WTM8 + 
                        (self.stop_in_watermark as u8) << 7 & STOP_ON_WTM ;
         registers[2] = self.acceleration as u8;
-        registers[3] = (self.mode as u8 & FIFO_MODE_MASK) + ((self.temperature as u8) << 6  & ODR_T_MASK) + ((self.timestamp as u8) << 4 & DEC_TS_MASK) ;
+        registers[3] = (self.mode as u8 & FIFO_MODE_MASK) + ((self.temperature as u8) << 4  & ODR_T_MASK) + ((self.timestamp as u8) << 6 & DEC_TS_MASK) ;
 
         registers
     }
@@ -166,11 +166,20 @@ where
                         &mut buffer2);
         (buffer1[0],buffer2[0])
     }
-    pub fn fifo_read(&mut self) -> [u8;700] {
-        let mut bytes =  [0u8;701];
+    pub fn fifo_read(&mut self) -> [u8;3500] {
+        let mut bytes =  [0u8;3501];
         bytes[0] = Register::FIFO_DATA_OUT_TAG.addr() | SPI_READ;
         self.read(&mut bytes);
-        bytes[1..701].try_into().unwrap() // this copies
+        bytes[1..3501].try_into().unwrap() // this copies
     }
+    // pub fn fifo_read_to_buffer(&mut self, buffer: &mut [u8]) -> Result<(),Error> {
+    //     todo!();
+    //     let mut bytes =  [0u8;701];
+    //     bytes[0] = Register::FIFO_DATA_OUT_TAG.addr() | SPI_READ;
+    //     self.read(&mut bytes);
+    //     bytes[1..701].try_into().unwrap(); // this copies
+
+    //     Ok(())
+    // }
 
 } 

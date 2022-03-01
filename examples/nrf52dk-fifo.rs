@@ -1,20 +1,18 @@
-//! This example is for the nRF 52 DK 
-
-#![deny(unsafe_code)]
 #![no_std]
 #![no_main]
+#![deny(unsafe_code)]
+#![feature(type_alias_impl_trait)]
 
 use defmt_rtt as _;
 use cortex_m_rt::entry;
 use defmt::*;
 use defmt::panic;
 use embedded_hal::blocking::spi::*;
-use nrf52840_hal:: {gpio,
-                    spim,
-                    gpio::p0,   
-                    gpio::Level,
-                    Spim,
-                    };
+use embassy::executor::Spawner;
+use embassy::time::{Duration, Timer, Instant};
+use embassy_nrf::Peripherals;
+use embassy_nrf::gpio::{Level, Input, Output, OutputDrive, Pull};
+use embassy_nrf::{interrupt, qspi, spim};
 
 use iis3dwb::{Config as IIS3DWBConfig, Range, IIS3DWB, 
                         Accelerometer, RawAccelerometer,
@@ -24,6 +22,15 @@ use iis3dwb::{Config as IIS3DWBConfig, Range, IIS3DWB,
                         FifoTimestampDecimation,
                         Watermark,
                         TimestampedAcceleration};
+
+const PAGE_SIZE: usize = 4096;
+
+// Workaround for alignment requirements.
+// Nicer API will probably come in the future.
+#[repr(C, align(4))]
+struct AlignedBuf([u8; 4096]);
+#[repr(C, align(4))]
+struct AlignedBuf3500([u8; 3500]);
 
 
 use panic_probe as _;
@@ -39,39 +46,103 @@ pub fn exit() -> ! {
 }
 
 
-#[entry]
-fn main() -> ! {
-    info!("running!");
+#[embassy::main]
+async fn main(spawner: Spawner, mut p: Peripherals){
 
-    let p = nrf52840_hal::pac::Peripherals::take().unwrap();
-    let port0 = p0::Parts::new(p.P0);
-    let ncs = port0.p0_14.into_push_pull_output(Level::High);
-    let spiclk = port0.p0_13.into_push_pull_output(Level::Low).degrade();
-    let spimiso = port0.p0_16.into_floating_input().degrade();
-    let spimosi = port0.p0_15.into_push_pull_output(Level::Low).degrade();
+    let mut config = qspi::Config::default();
+    config.read_opcode = qspi::ReadOpcode::READ4IO;
+    config.write_opcode = qspi::WriteOpcode::PP4IO;
+    config.write_page_size = qspi::WritePageSize::_256BYTES;    
 
-    let spi_pins = nrf52840_hal::spim::Pins {
-        sck: spiclk,
-        miso: Some(spimiso),
-        mosi: Some(spimosi),
-    };
+    
+    let mut irq = interrupt::take!(QSPI);
 
-    let mut spi =   Spim::new(
-        p.SPIM3,
-        spi_pins,
-        nrf52840_hal::spim::Frequency::M32,
-        nrf52840_hal::spim::MODE_3, 
-        0
-    );
+    let mut q = qspi::Qspi::new(
+        &mut p.QSPI, 
+        &mut irq, 
+    &mut p.P0_19, 
+    &mut p.P0_17,
+    &mut p.P0_20,
+    &mut p.P0_21,
+    &mut p.P0_22,
+    &mut p.P0_23,
+        config,
+    ).await;
+    
+    
+    defmt::info!("FLASH ACTIVE");
+
+    // Read Config
+    let mut rdcr =  [0; 2];
+    unwrap!(q.custom_instruction(0x15, &[], &mut rdcr).await);
+    info!("rdcr: {=[u8]:x}", rdcr);
+    
+    // Read ID
+    let mut id = [1; 3];
+    unwrap!(q.custom_instruction(0x9F, &[], &mut id).await);
+    info!("id: {=[u8]:x}", id);
+
+    // Read Electronic ID
+    let mut res =  [1; 4];
+    unwrap!(q.custom_instruction(0xAB, &[], &mut res).await);
+    info!("res: {:x}", res[3]);
+
+    // Read status register
+    let mut status = [4; 1];
+    unwrap!(q.custom_instruction(0x05, &[], &mut status).await);
+    info!("status: {:x}", status[0]);
+
+    let mut status_and_rdcr = [status[0],rdcr[0],rdcr[1]];
+    if status_and_rdcr[0] & 0x40 == 0 {
+        status_and_rdcr[0] |= 0x40;
+    }
+    status_and_rdcr[2] |= 0x02;
+
+    unwrap!(q.custom_instruction(0x01, &status_and_rdcr, &mut []).await);
+    info!("enabled quad in status");
+    info!("enabled high perf? in config");
+
+    info!("page erasing... ", );
+    let before = Instant::now().as_ticks();
+    unwrap!(q.erase(0*PAGE_SIZE).await);
+    unwrap!(q.erase(1*PAGE_SIZE).await);
+    unwrap!(q.erase(2*PAGE_SIZE).await);
+    unwrap!(q.erase(3*PAGE_SIZE).await);
+    unwrap!(q.erase(4*PAGE_SIZE).await);
+    unwrap!(q.erase(5*PAGE_SIZE).await);
+    unwrap!(q.erase(6*PAGE_SIZE).await);
+    unwrap!(q.erase(7*PAGE_SIZE).await);
+    unwrap!(q.erase(8*PAGE_SIZE).await);
+    let after = Instant::now().as_ticks();
+    info!("took {} ticks", after-before); 
+
+        let mut config = spim::Config::default();
+        config.frequency = spim::Frequency::M16;
+    
+
+        let mut irq = interrupt::take!(SPIM3);
+        let mut spim = spim::Spim::new( &mut p.SPI3, 
+                                                        &mut irq, 
+                                                        &mut p.P0_13,
+                                                        &mut p.P0_16,
+                                                        &mut p.P0_15,
+                                                        config);
+
+        let mut ncs = Output::new(&mut p.P0_14, Level::High, OutputDrive::Standard);
+        
+        defmt::info!("ACC CONFIG");
+
+        let  acc_cfg = IIS3DWBConfig::default();
+        
 
     let mut acc_cfg = IIS3DWBConfig::default();
 
     acc_cfg.fifo.mode = FifoMode::FifoMode;
-    acc_cfg.fifo.temperature = FifoTempBatchDataRate::BDR104Hz;
+    acc_cfg.fifo.temperature = FifoTempBatchDataRate::Omitted;
     acc_cfg.fifo.timestamp = FifoTimestampDecimation::Decimation1;
     acc_cfg.fifo.acceleration = FifoAccBatchDataRate::BDR26667Hz;
     acc_cfg.fifo.watermark = Watermark::from_bytes(0xFF);
-    let mut accelerometer = IIS3DWB::new(spi, ncs, &acc_cfg).unwrap();
+    let mut accelerometer = IIS3DWB::new(spim, ncs, &acc_cfg).unwrap();
     let id = accelerometer.get_device_id();
     defmt::info!("The device ID is: 0x{=u8:x}", id);
     // let temp = accelerometer.read_temp_raw();
@@ -86,7 +157,7 @@ fn main() -> ! {
     accelerometer.set_fifo_mode(FifoMode::Disabled);
     accelerometer.set_fifo_mode(FifoMode::FifoMode);
 
-    cortex_m::asm::delay(50000);   // KISS.
+    cortex_m::asm::delay(250000);   // KISS.
     defmt::info!("FIFO Data 1: {}",accelerometer.unread_data_count());
     cortex_m::asm::delay(50000);   // KISS.
     defmt::info!("FIFO Data 2: {}",accelerometer.unread_data_count());
@@ -100,19 +171,43 @@ fn main() -> ! {
     defmt::info!("FIFO Data 6: {}",accelerometer.unread_data_count());
     cortex_m::asm::delay(50000);   // KISS.
     defmt::info!("FIFO Data 7: {}",accelerometer.unread_data_count());
-
-    let mut buffer = [0u8;700];
-    buffer = accelerometer.fifo_read();
     
-    defmt::info!("FIFO First  700 reads: {=[u8]:x}",buffer);
-    defmt::info!("FIFO After 700 reads: {}",accelerometer.unread_data_count());
-    buffer = accelerometer.fifo_read();
+    
+    let mut buffer =  AlignedBuf3500([0u8; 3500]);
+    
+    info!("measuring...");  
+    let before = Instant::now().as_ticks();
+    buffer.0 = accelerometer.fifo_read();
+    let after = Instant::now().as_ticks();
+    info!("took {} ticks", after-before);  
+    info!("measured: {=[u8]:x}", buffer.0); 
 
-    defmt::info!("FIFO After another 700 reads: {}",accelerometer.unread_data_count());
-    defmt::info!("FIFO Last 700 reads: {=[u8]:x}",buffer);
+    info!("writing...");    
+    let before = Instant::now().as_ticks();
+    unwrap!(q.write(0, &buffer.0).await);
+    let after = Instant::now().as_ticks();
+    info!("took {} ticks", after-before); 
+    info!("written: {=[u8]:x}", buffer.0);    
+
+
+    info!("reading...");   
+    let before = Instant::now().as_ticks(); 
+    unwrap!(q.read(0, &mut buffer.0).await);
+    let after = Instant::now().as_ticks();
+    info!("took {} ticks", after-before);  
+    info!("read: {=[u8]:x}", buffer.0);
+    
+    defmt::info!("FIFO After 3500 reads: {}",accelerometer.unread_data_count());
+
     
     accelerometer.stop();
+    accelerometer.reset();
+    
+    while accelerometer.resetting() {
+        cortex_m::asm::wfe();
+    }
+    defmt::info!("Resetted!");
+
    
     exit();
 }
-
