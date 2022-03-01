@@ -28,7 +28,6 @@ pub use fifos::{FifoAccBatchDataRate,
                 FifoTempBatchDataRate,
                 FifoTimestampDecimation,
                 Watermark};
-use nrf52840_hal::Timer;
 // use interrupts::{Interrupt1, Interrupt2};
 // use wakeups::{WakeUp};
 pub use register::{ DataRate, Mode, Range, Register,
