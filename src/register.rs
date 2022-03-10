@@ -138,6 +138,13 @@ pub enum Register_1 {
     INTF_CONFIG6 =	0x7C,
 }
 
+impl Register_1 {
+    /// Get register address
+    pub fn addr(self) -> u8 {
+        self as u8
+    }
+}
+
  /// Enumerate all device registers.
  #[allow(dead_code, non_camel_case_types, clippy::upper_case_acronyms)]
  #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -150,6 +157,14 @@ pub enum Register_1 {
     YA_ST_DATA =	0x3C,
     ZA_ST_DATA =	0x3D,
  }
+
+ impl Register_2 {
+    /// Get register address
+    pub fn addr(self) -> u8 {
+        self as u8
+    }
+}
+
  /// Enumerate all device registers.
  #[allow(dead_code, non_camel_case_types, clippy::upper_case_acronyms)]
  #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -479,7 +494,15 @@ pub const MASK_GYRO_UI_FS_SEL: u8 = 0b1110_0000;
 pub const MASK_ACCEL_ODR: u8 = 0b0000_1111;
 pub const MASK_ACCEL_UI_FS_SEL: u8 = 0b1110_0000;
 
+// TMST_CONFIG
+pub const TMST_TO_REGS_EN: u8 = 0b0001_0000;
+pub const TMST_RES: u8 = 0b0000_1000;
+pub const TMST_DELTA_EN: u8 = 0b0000_0100;
+pub const TMST_FSYNC_EN: u8 = 0b0000_0010;
+pub const TMST_EN: u8 = 0b0000_0001;
+
 
 // BANK 3 
 // PU_PD_CONFIG2
 pub const PIN1_PU_EN:u8 = 0b1000_0000;
+

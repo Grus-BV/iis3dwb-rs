@@ -30,7 +30,7 @@ use micromath::generic_array::{arr, GenericArray, typenum::U3};
 //                 Watermark};
 // use interrupts::{Interrupt1, Interrupt2};
 // use wakeups::{WakeUp};
-pub use register::{Bank, DataRate, Mode, Range, Register, Register_3,
+pub use register::{Bank, DataRate, Mode, Range, Register, Register_3, Register_1,
                     InternalFreqFinetuned, Timestamp,
                     AccelerometerMode, GyroMode};
 use register::{DEVICE_ID,
@@ -43,6 +43,8 @@ use register::{DEVICE_ID,
                 // MASK_GYRO_UI_FS_SEL,
                 SOFT_RESET_CONFIG,
                 PIN1_PU_EN,
+                TMST_EN,
+                TMST_TO_REGS_EN,
             };
 
 use core::fmt::Debug;
@@ -261,7 +263,11 @@ where
     }
 
     pub fn get_timestamp (&mut self) -> Timestamp {
-        unimplemented!()
+        let mut bytes = [0u8; 2+1];
+        bytes[0] = Register_1::TMSTVAL0.addr() | SPI_READ;
+        self.read(&mut bytes);
+        let tstamp = bytes[1] as u32 + (bytes[2] as u32) * 256;
+        Timestamp(tstamp)
     }
 
     pub fn set_if_increment (&mut self, state: bool){
@@ -273,7 +279,10 @@ where
     }
     
     pub fn set_timestamp_en (&mut self, state: bool){
-        unimplemented!()
+        self.modify_register( Register::TMST_CONFIG.addr(), 
+        TMST_EN, state as u8).unwrap();
+        self.modify_register( Register::TMST_CONFIG.addr(), 
+        TMST_TO_REGS_EN, state as u8).unwrap();
     }
 
     pub fn reset_timestamp (&mut self){
