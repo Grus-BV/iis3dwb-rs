@@ -1,15 +1,15 @@
 #![no_std]
 
 mod register;
-mod interrupts;
+//mod interrupts;
 mod wakeups;
-mod fifos;   
+//mod fifos;   
 
 /// Is there a way to improve this to non blocking? Does that require async? 
 pub use embedded_hal::blocking::spi;
 
 use embedded_hal::digital::v2::OutputPin;
-pub use interrupts::{Interrupt1,InterruptConfigSrc1,InterruptSource1};
+//pub use interrupts::{Interrupt1,InterruptConfigSrc1,InterruptSource1};
 pub use accelerometer::{
     Accelerometer,
     RawAccelerometer,
@@ -19,27 +19,30 @@ pub use accelerometer::{
     Vector,
 };
 use core::ops::Index;
-use micromath::generic_array::{arr, typenum::U3, GenericArray};
+use micromath::generic_array::{arr, GenericArray, typenum::U3};
 
 
-use fifos::{FifoConfig};
-pub use fifos::{FifoAccBatchDataRate,
-                FifoMode,
-                FifoTempBatchDataRate,
-                FifoTimestampDecimation,
-                Watermark};
+// use fifos::{FifoConfig};
+// pub use fifos::{FifoAccBatchDataRate,
+//                 FifoMode,
+//                 FifoTempBatchDataRate,
+//                 FifoTimestampDecimation,
+//                 Watermark};
 // use interrupts::{Interrupt1, Interrupt2};
 // use wakeups::{WakeUp};
-pub use register::{ DataRate, Mode, Range, Register,
-                    InternalFreqFinetuned, Timestamp,};
+pub use register::{Bank, DataRate, Mode, Range, Register, Register_3,
+                    InternalFreqFinetuned, Timestamp,
+                    AccelerometerMode, GyroMode};
 use register::{DEVICE_ID,
-               XL_EN_MASK,
-               FS_EN_MASK,
-               TIMESTAMP_EN,
-               SW_RESET,
-               I2C_DISABLE,
-               IF_INC,
-               ROUNDING_EN,
+                MASK_BANK_SEL,
+                MASK_ACCEL_MODE,
+                MASK_ACCEL_ODR,
+                MASK_ACCEL_UI_FS_SEL,
+                MASK_GYRO_MODE,
+                // MASK_GYRO_ODR,
+                // MASK_GYRO_UI_FS_SEL,
+                SOFT_RESET_CONFIG,
+                PIN1_PU_EN,
             };
 
 use core::fmt::Debug;
@@ -56,8 +59,8 @@ pub struct Config {
     pub enable_z_axis: bool,   
     pub enable_temp:bool,
     pub range: Range,
-    pub interrupt1: Interrupt1,
-    pub fifo: FifoConfig,
+    // pub interrupt1: Interrupt1,
+    // pub fifo: FifoConfig,
     // pub interrupt2: Range,
     // pub wake_up: WakeUp,
 }
@@ -66,95 +69,106 @@ impl Default for Config{
     fn default() -> Self {
         Self {
             mode: Mode::HighResolution,
-            datarate: DataRate::Hz_26700,
+            datarate: DataRate::Hz_32000,
             enable_x_axis: true,   
             enable_y_axis: true,   
             enable_z_axis: true,   
             enable_temp: true,
             range: Range::G2,
-            interrupt1: Interrupt1::default(),
-            fifo: FifoConfig::default(),
-            // interrupt2: Interrupt2::None,
-            // wake_up: WakeUp::None,
+            // interrupt1: Interrupt1::default(),
+            // fifo: FifoConfig::default(),
         }
     }
 }
 
 /// Driver's structure
-pub struct IIS3DWB <SPI, CS>{
+pub struct IIM42652 <SPI, CS>{
     spi : SPI,
     cs  : CS,
     // configuration 
     range : Range,
-    interrupt1: Interrupt1,
-    fifo: FifoConfig,
-    // interrupt2: Interrupt2,
-    // wake_up: WakeUp,
+    // interrupt1: Interrupt1,
+    // fifo: FifoConfig,
 }
 
 /// Driver's implementation for given SPI and CS
-impl<SPI, CS, E, PinError> IIS3DWB<SPI,CS>
+impl<SPI, CS, E, PinError> IIM42652<SPI,CS>
 where 
     SPI: spi::Transfer<u8, Error=E> + spi::Write<u8, Error=E>,
     CS: OutputPin <Error= PinError>
 {
     pub fn new(spi: SPI, cs: CS, config: &Config) -> Result<Self,E> {
-        let mut iis3dwb = IIS3DWB {
+        let mut IIM42652 = IIM42652 {
             spi,
             cs, 
             range: config.range,
-            interrupt1: config.interrupt1,
-            fifo: config.fifo,
-            // interrupt2: config.interrupt2,
-            // wake_up: config.wake_up
+            // interrupt1: config.interrupt1,
+            // fifo: config.fifo,
         };
-        
-        let id= iis3dwb.get_device_id();
+        IIM42652.reset();
+        cortex_m::asm::delay(10000);
+        let id= IIM42652.get_device_id();
         if id != DEVICE_ID {
             // raise
         }
-        iis3dwb.set_if_increment(true);
-        iis3dwb.set_range(iis3dwb.range);
-        iis3dwb.set_timestamp_en(true);
-        iis3dwb.configure_fifo(iis3dwb.fifo);
-        iis3dwb.set_interrupt_1(iis3dwb.interrupt1);
-        Ok(iis3dwb)
+        IIM42652.set_range(IIM42652.range);
+        // IIM42652.set_timestamp_en(true);
+        // IIM42652.configure_fifo(IIM42652.fifo);
+        // IIM42652.set_interrupt_1(IIM42652.interrupt1);
+        Ok(IIM42652)
     }  
 
-    pub fn start(&mut self) {
-        self.modify_register( Register::CTRL1_XL.addr(), 
-                             XL_EN_MASK, 
-                              0b101).unwrap();
+    fn switch_reg_bank(&mut self, bank: Bank){
+        self.modify_register(Register::REG_BANK_SEL.addr(),
+                            MASK_BANK_SEL,
+                            bank.bits()).unwrap();
+    }
+
+    pub fn set_pull_up_miso(&mut self, mode: u8){
+        self.switch_reg_bank(Bank::Bank3);
+        self.modify_register(Register_3::PU_PD_CONFIG2.addr(),
+                            PIN1_PU_EN,
+                            mode).unwrap();
+                            
+        self.switch_reg_bank(Bank::Bank0);
+    }
+
+    pub fn set_acc_mode(&mut self, mode: AccelerometerMode) {
+        self.modify_register( Register::PWR_MGMT0.addr(), 
+                             MASK_ACCEL_MODE, 
+                             mode.bits()).unwrap();
+        cortex_m::asm::delay(12800); // wait 200us
+    }  
+
+    pub fn set_gyro_mode(&mut self, mode: GyroMode) {
+        self.modify_register( Register::PWR_MGMT0.addr(), 
+                             MASK_GYRO_MODE, 
+                             mode.bits()).unwrap();
     }  
 
     pub fn stop(&mut self) {
-        self.modify_register( Register::CTRL1_XL.addr(), 
-                             XL_EN_MASK, 
-                              0b000).unwrap();
+        self.set_acc_mode(AccelerometerMode::Off);
+        self.set_gyro_mode(GyroMode::Off);
     }
     
     pub fn reset(&mut self) {
-        self.modify_register( Register::CTRL3_C.addr(), 
-                            SW_RESET, 
-                            SW_RESET).unwrap();        
+        self.modify_register( Register::DEVICE_CONFIG.addr(), 
+                            SOFT_RESET_CONFIG, 
+                            0b1).unwrap();        
     }    
 
     pub fn resetting(&mut self) -> bool {
-        let mut result = [1u8];
-        self.read_reg(Register::CTRL3_C.addr(), &mut result);
-        result[0] & SW_RESET == 1
+        unimplemented!();
     }
 
     pub fn set_range(&mut self, range: Range) {
-        self.modify_register( Register::CTRL1_XL.addr(), 
-                              FS_EN_MASK, 
+        self.modify_register( Register::ACCEL_CONFIG0.addr(), 
+                                MASK_ACCEL_UI_FS_SEL, 
                               range.bits()).unwrap();
     }
 
     pub fn disable_i2c(&mut self) {
-        self.modify_register( Register::CTRL4_C.addr(), 
-                            I2C_DISABLE, 
-                            I2C_DISABLE).unwrap();
+        unimplemented!();
     }
 
     /// Get the device ID
@@ -167,7 +181,7 @@ where
 
       /// Returns the raw contents of the temperature registers
     pub fn read_temp_raw(&mut self) -> u16 {
-        let mut bytes = [Register::OUT_TEMP_L.addr() | SPI_READ, 0, 0];
+        let mut bytes = [Register::TEMP_DATA1_UI.addr() | SPI_READ, 0, 0];
         self.read(&mut bytes);
 
         let temp_h = ((bytes[1] & 0x0F) as u16) << 8;
@@ -178,7 +192,7 @@ where
 
     fn write_reg(&mut self, reg: u8, value: u8) {
         let mut bytes = [ reg | SPI_WRITE, value];
-        defmt::debug!("spi_bytes: {=[u8]:x}", bytes);
+        defmt::debug!("write cmd spi_bytes: {=[u8]:x}", bytes);
         self.cs.set_low().ok();
         self.spi.write(&mut bytes).ok();
         self.cs.set_high().ok();
@@ -186,17 +200,19 @@ where
 
     fn read_reg(&mut self, reg: u8, buffer: &mut [u8]) {
         let mut bytes = [ reg | SPI_READ, 0];
-        defmt::debug!("spi_bytes: {=[u8]:x}", bytes);
+        defmt::debug!("read cmd spi_bytes: {=[u8]:x}", bytes);
         self.cs.set_low().ok();
         self.spi.transfer(&mut bytes).ok();
-        defmt::debug!("spi_bytes after xfer: {=[u8]:x}", bytes);
+        defmt::debug!("after xfer: {=[u8]:x}", bytes);
         self.cs.set_high().ok();
         buffer[0] = bytes[1];
     }
 
     fn read(&mut self, bytes: &mut [u8]) {
         self.cs.set_low().ok();
+        defmt::trace!("Read before xfer {=[u8]:x}",bytes);
         self.spi.transfer(bytes).ok();
+        defmt::trace!("Read after xfer {=[u8]:x}",bytes);
         self.cs.set_high().ok();
     }
 
@@ -204,18 +220,11 @@ where
         unimplemented!();
     }
 
-    /// Ask TweedeGolf about their implementation, why pass function?
-    /// I chose a simplistic way, since this is my first rs dd.
-    /// 
-    /// Also, test this, it is a slippery slope.
-    /// TODO willing to put error cases here. 
     fn modify_register(&mut self, reg: u8, mask: u8, val: u8) -> Result<(),()>
     {
         if mask == 0 {return Err(());}
         let mut register_value=[0u8]; 
-        defmt::debug!("val: {=u8:#010b} reg: {=u8:x} mask: {=u8:#010b}", val, reg, mask);
         self.read_reg( reg,&mut register_value);
-        defmt::debug!("device values reg: {=u8:#010b}", register_value[0]);
         let mut bitshift = 0u8;
         let mut sacrificial_mask = mask.clone();
         //ugly dangerous loop calculating shifts 
@@ -240,53 +249,41 @@ where
         let clear_mask = !mask;
         let set_mask = val << bitshift;
         register_value[0] = (register_value[0] & clear_mask) | set_mask;
-        defmt::debug!("{=u8:#010b} written to {=u8:#010b}", register_value[0], reg);
         self.write_reg( reg, register_value[0]);
         Ok(())
     }
+    
 
-    pub fn get_odr(&mut self) -> InternalFreqFinetuned {
-        // Get it from reading FINE ODR
-        let mut buff = [0u8];
-        self.read_reg(Register::INTERNAL_FREQ_FINE.addr(), &mut buff);
-        InternalFreqFinetuned(buff[0])
+    pub fn get_odr(&mut self) -> DataRate {
+        let mut buffer = [0u8];
+        self.read_reg(Register::ACCEL_CONFIG0.addr(), &mut buffer);
+        DataRate::from_raw(buffer[0] & MASK_ACCEL_ODR)
     }
 
     pub fn get_timestamp (&mut self) -> Timestamp {
-        // TODO read multiple regs
-        let mut bytes = [0u8; 4+1];
-        bytes[0] = Register::TIMESTAMP0.addr() | SPI_READ;
-
-        self.read(&mut bytes);
-        let tstamp_lsb = bytes[4] as u16 + (bytes[3] as u16) * 256;
-        let tstamp_msb = bytes[1] as u16 + (bytes[2] as u16) * 256;
-        Timestamp(tstamp_lsb as u32 + (tstamp_msb as u32 * 256 * 256))
+        unimplemented!()
     }
 
     pub fn set_if_increment (&mut self, state: bool){
-        self.modify_register( Register::CTRL3_C.addr(), 
-                            IF_INC, state as u8).unwrap();
+        unimplemented!()
     }
 
     pub fn set_rounding (&mut self, state: bool){
-        self.modify_register( Register::CTRL5_C.addr(), 
-                            ROUNDING_EN, state as u8).unwrap();
+        unimplemented!()
     }
     
     pub fn set_timestamp_en (&mut self, state: bool){
-        self.modify_register( Register::CTRL10_C.addr(), 
-                            TIMESTAMP_EN, state as u8).unwrap();
+        unimplemented!()
     }
-    /// AN5444 states that writing 0xAA to TIMESTAMP2 resets the timestamp
+
     pub fn reset_timestamp (&mut self){
-        self.modify_register( Register::TIMESTAMP2.addr(), 
-                            0xFF, 0xAA as u8).unwrap();
+        unimplemented!()
     }
     
     pub fn one_shot_acc(&mut self) -> (f32,f32,f32) {
         // TODO read multiple regs
         let mut bytes = [0u8; 6+1];
-        bytes[0] = Register::OUTX_L_A.addr() | SPI_READ;
+        bytes[0] = Register::ACCEL_DATA_X1_UI.addr() | SPI_READ;
         self.read(&mut bytes);
 
         let x_u16 = bytes[1] as u16 + (bytes[2] as u16) * 256;
@@ -299,13 +296,14 @@ where
 
         (x as f32 * 0.061, y as f32 * 0.061, z as f32 * 0.061)
     }
+
     // destroy the instance and return the spi bus and its cs pin
     pub fn destroy(self) -> (SPI, CS) {
         (self.spi, self.cs)
     }
 }
 
-impl<SPI, CS, E, PinError> RawAccelerometer<I16x3> for IIS3DWB <SPI, CS>
+impl<SPI, CS, E, PinError> RawAccelerometer<I16x3> for IIM42652 <SPI, CS>
 where
     SPI: spi::Transfer<u8, Error=E> + spi::Write<u8, Error=E>,
     CS: OutputPin<Error = PinError>,
@@ -317,19 +315,19 @@ where
     /// Returns a 3D vector with x,y,z, fields in a Result
     fn accel_raw(&mut self) -> Result<I16x3, Error<E>> {
         let mut bytes = [0u8; 6+1];
-        bytes[0] = Register::OUTX_L_A.addr() | SPI_READ;
+        bytes[0] = Register::ACCEL_DATA_X1_UI.addr() | SPI_READ;
         self.read(&mut bytes);
 
         // TEST THIS 
-        let x = (bytes[1] as u16 + (bytes[2] as u16) * 256 ) as i16;
-        let y = (bytes[3] as u16 + (bytes[4] as u16) * 256 ) as i16;
-        let z = (bytes[5] as u16 + (bytes[6] as u16) * 256 ) as i16;
+        let x = (bytes[2] as u16 + (bytes[1] as u16) * 256 ) as i16;
+        let y = (bytes[4] as u16 + (bytes[3] as u16) * 256 ) as i16;
+        let z = (bytes[6] as u16 + (bytes[5] as u16) * 256 ) as i16;
 
         Ok(I16x3::new(x, y, z))
     }
 }
 
-impl<SPI, CS, E, PinError> Accelerometer for IIS3DWB <SPI, CS>
+impl<SPI, CS, E, PinError> Accelerometer for IIM42652 <SPI, CS>
 where
     SPI: spi::Transfer<u8, Error=E> + spi::Write<u8, Error=E>,
     CS: OutputPin<Error = PinError>,
@@ -340,13 +338,14 @@ where
     fn accel_norm(&mut self) -> Result<F32x3, Error<Self::Error>> {
 
         let raw_values: I16x3 = self.accel_raw().unwrap();
-        let norm_values: F32x3 = F32x3::new(raw_values[0] as f32 *0.061 / 1000.0,
-                                            raw_values[1] as f32 *0.061 / 1000.0,
-                                            raw_values[2] as f32 *0.061 / 1000.0);
+        let norm_values: F32x3 = F32x3::new(raw_values[0] as f32 / 16384.0 ,
+                                            raw_values[1] as f32 / 16384.0 ,
+                                            raw_values[2] as f32 / 16384.0 );
         Ok(norm_values)
     }
+
     fn sample_rate(&mut self) -> Result<f32, Error<Self::Error>> {
-        Ok(self.get_odr().hz())
+        Ok(self.get_odr().sample_rate())
     }
 }
 
@@ -417,7 +416,7 @@ impl Vector for TimestampedAcceleration {
 
 }
 
-impl<SPI, CS, E, PinError> RawAccelerometer<TimestampedAcceleration> for IIS3DWB <SPI, CS>
+impl<SPI, CS, E, PinError> RawAccelerometer<TimestampedAcceleration> for IIM42652 <SPI, CS>
 where
     SPI: spi::Transfer<u8, Error=E> + spi::Write<u8, Error=E>,
     CS: OutputPin<Error = PinError>,
@@ -428,7 +427,7 @@ where
     fn accel_raw(&mut self) -> Result<TimestampedAcceleration, Error<E>> {
         
         let mut bytes = [0u8; 6+1];
-        bytes[0] = Register::OUTX_L_A.addr() | SPI_READ;
+        bytes[0] = Register::ACCEL_DATA_X1_UI.addr() | SPI_READ;
         self.read(&mut bytes);
 
         let x = (bytes[1] as u16 + (bytes[2] as u16) * 256 ) as i16;

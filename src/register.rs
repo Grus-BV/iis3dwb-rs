@@ -1,81 +1,205 @@
 #![allow(unused_variables)]
 use num_enum::TryFromPrimitive;
 
-/// Possible I²C slave addresses.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
-pub enum SlaveAddr {
-    /// Default slave address (`0x18`)
-    Default = 0x18,
-
-    /// Alternate slave address (`0x19`)
-    Alternate = 0x19,
+pub enum Bank {
+    Bank0 = 0b000,
+    Bank1 = 0b001,
+    Bank2 = 0b010,
+    Bank3 = 0b011,
+    Bank4 = 0b100,
 }
 
-impl SlaveAddr {
-    pub fn addr(self) -> u8 {
+impl Bank {
+    pub const fn bits(self) -> u8 {
         self as u8
     }
 }
+
+
+pub enum AccelerometerMode {
+    Off = 0b00,
+    LowPower = 0b10,
+    LowNoise = 0b11,
+}
+impl AccelerometerMode {
+    pub const fn bits(self) -> u8 {
+        self as u8
+    }
+}
+
+pub enum GyroMode {
+    Off = 0b00,
+    Standby = 0b01,
+    LowNoise = 0b11,
+}
+
+impl GyroMode {
+    pub const fn bits(self) -> u8 {
+        self as u8
+    }
+}
+
+pub enum TemperatureMode {
+    Off = 0b1,
+    On = 0b0,
+}
+
 
 /// Enumerate all device registers.
 #[allow(dead_code, non_camel_case_types, clippy::upper_case_acronyms)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Register {
-    PIN_CTRL = 0x02,
-    FIFO_CTRL_1 = 0x07,
-    FIFO_CTRL_2 = 0x08,
-    FIFO_CTRL_3 = 0x09,
-    FIFO_CTRL_4 = 0x0A,
-    COUNTER_BDR_REG1 = 0x0B,
-    COUNTER_BDR_REG2 = 0x0C,
-    INT1_CTRL = 0x0D,
-    INT2_CTRL = 0x0E,
-    WHO_AM_I = 0x0F,
-    CTRL1_XL = 0x10,
-    CTRL3_C = 0x12,
-    CTRL4_C = 0x13,
-    CTRL5_C = 0x14,
-    CTRL6_C = 0x15,
-    CTRL7_C = 0x16,
-    CTRL8_XL = 0x17,
-    CTRL10_C = 0x19,
-    ALL_INT_SRC = 0x1A,
-    WAKE_UP_SRC = 0x1B,
-    STATUS_REG = 0x1E,
-    OUT_TEMP_L = 0x20,
-    OUT_TEMP_H = 0x21,
-    OUTX_L_A = 0x28,
-    OUTX_H_A = 0x29,
-    OUTY_L_A = 0x2A,
-    OUTY_H_A = 0x2B,
-    OUTZ_L_A = 0x2C,
-    OUTZ_H_A = 0x2D,
-    FIFO_STATUS1 = 0x3A,
-    FIFO_STATUS2 = 0x3B,
-    TIMESTAMP0 = 0x40,
-    TIMESTAMP1 = 0x41,
-    TIMESTAMP2 = 0x42,
-    TIMESTAMP3 = 0x43,
-    SLOPE_EN = 0x56,
-    INTERRUPTS_EN = 0x58,
-    WAKE_UP_THS = 0x5B,
-    WAKE_UP_DUR = 0x5C,
-    MD1_CFG = 0x5E,
-    MD2_CFG = 0x5F,
-    INTERNAL_FREQ_FINE = 0x63,
-    X_OFS_USR = 0x73,
-    Y_OFS_USR = 0x74,
-    Z_OFS_USR = 0x75,
-    FIFO_DATA_OUT_TAG = 0x78,
-    FIFO_DATA_OUT_X_L = 0x79,
-    FIFO_DATA_OUT_X_H = 0x7A,
-    FIFO_DATA_OUT_Y_L = 0x7B,
-    FIFO_DATA_OUT_Y_H = 0x7C,
-    FIFO_DATA_OUT_Z_L = 0x7D,
-    FIFO_DATA_OUT_Z_H = 0x7E,
-    
+    DEVICE_CONFIG =	0x11,
+    DRIVE_CONFIG =	0x13,
+    INT_CONFIG =	0x14,
+    FIFO_CONFIG =	0x16,
+    TEMP_DATA1_UI =	0x1D,
+    TEMP_DATA0_UI =	0x1E,
+    ACCEL_DATA_X1_UI =	0x1F,
+    ACCEL_DATA_X0_UI =	0x20,
+    ACCEL_DATA_Y1_UI =	0x21,
+    ACCEL_DATA_Y0_UI =	0x22,
+    ACCEL_DATA_Z1_UI =	0x23,
+    ACCEL_DATA_Z0_UI =	0x24,
+    GYRO_DATA_X1_UI =	0x25,
+    GYRO_DATA_X0_UI = 0x26,
+    GYRO_DATA_Y1_UI = 0x27,
+    GYRO_DATA_Y0_UI = 0x28,
+    GYRO_DATA_Z1_UI = 0x29,
+    GYRO_DATA_Z0_UI = 0x2A,
+    TMST_FSYNCH =	0x2B,
+    TMST_FSYNCL =	0x2C,
+    INT_STATUS =	0x2D,
+    FIFO_COUNTH =	0x2E,
+    FIFO_COUNTL =	0x2F,
+    FIFO_DATA =	    0x30,
+    APEX_DATA0 =	0x31,
+    APEX_DATA1 =	0x32,
+    APEX_DATA2 =	0x33,
+    APEX_DATA3 =	0x34,
+    APEX_DATA4 =	0x35,
+    APEX_DATA5 =	0x36,
+    INT_STATUS2 =	0x37,
+    INT_STATUS3 =	0x38,
+    SIGNAL_PATH_RESET =	0x4B,
+    INTF_CONFIG0 =	0x4C,
+    INTF_CONFIG1 =	0x4D,
+    PWR_MGMT0 =	0x4E,
+    GYRO_CONFIG0 =	0x4F,
+    ACCEL_CONFIG0 =	0x50,
+    GYRO_CONFIG1 =	0x51,
+    GYRO_ACCEL_CONFIG0 =	0x52,
+    ACCEL_CONFIG1 =	0x53,
+    TMST_CONFIG =	0x54,
+    APEX_CONFIG0 =	0x56,
+    SMD_CONFIG =	0x57,
+    FIFO_CONFIG1 =	0x5F,
+    FIFO_CONFIG2 =	0x60,
+    FIFO_CONFIG3 =	0x61,
+    FSYNC_CONFIG =	0x62,
+    INT_CONFIG0 =	0x63,
+    INT_CONFIG1 =	0x64,
+    INT_SOURCE0 =	0x65,
+    INT_SOURCE1 =	0x66,
+    INT_SOURCE3 =	0x68,
+    INT_SOURCE4 =	0x69,
+    FIFO_LOST_PKT0 =	0x6C,
+    FIFO_LOST_PKT1 =	0x6D,
+    SELF_TEST_CONFIG =	0x70,
+    WHO_AM_I =	0x75,
+    REG_BANK_SEL =	0x76,
+}
+ /// Enumerate all device registers.
+#[allow(dead_code, non_camel_case_types, clippy::upper_case_acronyms)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[repr(u8)]
+pub enum Register_1 {    
+    SENSOR_CONFIG0 =	0x3,
+    GYRO_CONFIG_STATIC2 =	0x0B,
+    GYRO_CONFIG_STATIC3 =	0x0C,
+    GYRO_CONFIG_STATIC4 =	0x0D,
+    GYRO_CONFIG_STATIC5 =	0x0E,
+    GYRO_CONFIG_STATIC6 =	0x0F,
+    GYRO_CONFIG_STATIC7 =	0x10,
+    GYRO_CONFIG_STATIC8 =	0x11,
+    GYRO_CONFIG_STATIC9 =	0x12,
+    GYRO_CONFIG_STATIC10 =	0x13,
+    XG_ST_DATA =	0x5F,
+    YG_ST_DATA =	0x60,
+    ZG_ST_DATA =	0x61,
+    TMSTVAL0 =	0x62,
+    TMSTVAL1 =	0x63,
+    TMSTVAL2 =	0x64,
+    INTF_CONFIG4 =	0x7A,
+    INTF_CONFIG5 =	0x7B,
+    INTF_CONFIG6 =	0x7C,
+}
+
+ /// Enumerate all device registers.
+ #[allow(dead_code, non_camel_case_types, clippy::upper_case_acronyms)]
+ #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+ #[repr(u8)]
+ pub enum Register_2 { 
+    ACCEL_CONFIG_STATIC2 =	0x3,
+    ACCEL_CONFIG_STATIC3 =	0x4,
+    ACCEL_CONFIG_STATIC4 =	0x5,
+    XA_ST_DATA =	0x3B,
+    YA_ST_DATA =	0x3C,
+    ZA_ST_DATA =	0x3D,
+ }
+ /// Enumerate all device registers.
+ #[allow(dead_code, non_camel_case_types, clippy::upper_case_acronyms)]
+ #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+ #[repr(u8)]
+ pub enum Register_3 { 
+    PU_PD_CONFIG1 =	0x6,
+    PU_PD_CONFIG2 =	0x0E,
+ }
+
+ 
+impl Register_3 {
+    /// Get register address
+    pub fn addr(self) -> u8 {
+        self as u8
+    }
+}
+ 
+ /// Enumerate all device registers.
+ #[allow(dead_code, non_camel_case_types, clippy::upper_case_acronyms)]
+ #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+ #[repr(u8)]
+ pub enum Register_4 { 
+    FDR_CONFIG =	0x9,
+    APEX_CONFIG1 =	0x40,
+    APEX_CONFIG2 =	0x41,
+    APEX_CONFIG3 =	0x42,
+    APEX_CONFIG4 =	0x43,
+    APEX_CONFIG5 =	0x44,
+    APEX_CONFIG6 =	0x45,
+    APEX_CONFIG7 =	0x46,
+    APEX_CONFIG8 =	0x47,
+    APEX_CONFIG9 =	0x48,
+    APEX_CONFIG10 =	0x49,
+    ACCEL_WOM_X_THR =	0x4A,
+    ACCEL_WOM_Y_THR =	0x4B,
+    ACCEL_WOM_Z_THR =	0x4C,
+    INT_SOURCE6 =	0x4D,
+    INT_SOURCE7 =	0x4E,
+    INT_SOURCE8 =	0x4F,
+    INT_SOURCE9 =	0x50,
+    INT_SOURCE10 =	0x51,
+    OFFSET_USER0 =	0x77,
+    OFFSET_USER1 =	0x78,
+    OFFSET_USER2 =	0x79,
+    OFFSET_USER3 =	0x7A,
+    OFFSET_USER4 =	0x7B,
+    OFFSET_USER5 =	0x7C,
+    OFFSET_USER6 =	0x7D,
+    OFFSET_USER7 =	0x7E,
+    OFFSET_USER8 =	0x7F,
 }
 
 impl Register {
@@ -88,52 +212,34 @@ impl Register {
     pub fn read_only(self) -> bool {
         matches!(
             self,
+            | Register::INT_STATUS
+            | Register::FIFO_COUNTH
+            | Register::FIFO_COUNTL
+            | Register::FIFO_DATA
+            | Register::APEX_DATA2
+            | Register::APEX_DATA3
+            | Register::APEX_DATA4
+            | Register::APEX_DATA5
+            | Register::INT_STATUS2
+            | Register::INT_STATUS3
+            | Register::FIFO_LOST_PKT0
+            | Register::FIFO_LOST_PKT1
             | Register::WHO_AM_I
-            | Register::ALL_INT_SRC
-            | Register::WAKE_UP_SRC
-            | Register::STATUS_REG
-            | Register::OUT_TEMP_L
-            | Register::OUT_TEMP_H
-            | Register::OUTX_L_A
-            | Register::OUTX_H_A
-            | Register::OUTY_L_A
-            | Register::OUTY_H_A
-            | Register::OUTZ_L_A
-            | Register::OUTZ_H_A
-            | Register::FIFO_STATUS1
-            | Register::FIFO_STATUS2
-            | Register::TIMESTAMP0
-            | Register::TIMESTAMP1
-            | Register::TIMESTAMP2
-            | Register::TIMESTAMP3
-            | Register::INTERNAL_FREQ_FINE
-            | Register::FIFO_DATA_OUT_TAG
-            | Register::FIFO_DATA_OUT_X_L
-            | Register::FIFO_DATA_OUT_X_H
-            | Register::FIFO_DATA_OUT_Y_L
-            | Register::FIFO_DATA_OUT_Y_H
-            | Register::FIFO_DATA_OUT_Z_L
-            | Register::FIFO_DATA_OUT_Z_H
         )
     }
 }
+
+
 
 /// Full-scale selection.
 #[allow(non_camel_case_types)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, TryFromPrimitive)]
 #[repr(u8)]
 pub enum Range {
-    /// ±16g
-    G16 = 0b01,
-
-    /// ±8g
-    G8 = 0b11,
-
-    /// ±4g
-    G4 = 0b10,
-
-    /// ±2g (Default)
-    G2 = 0b00,
+    G16 = 0b000,
+    G8 = 0b001,
+    G4 = 0b010,
+    G2 = 0b011,
 }
 
 impl Range {
@@ -185,21 +291,67 @@ impl Threshold {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, TryFromPrimitive)]
 #[repr(u8)]
 pub enum DataRate {
-    /// 400Hz (Default)
-    Hz_26700 = 0b0101,
-    /// Power down
-    PowerDown = 0b0000,
+    Hz_32000    = 0b0001,
+    Hz_16000    = 0b0010,
+    Hz_8000     = 0b0011,
+    Hz_4000     = 0b0100,
+    Hz_2000     = 0b0101,
+    Hz_1000     = 0b0110,
+    Hz_500      = 0b1111,
+    Hz_200      = 0b0111,
+    Hz_100      = 0b1000,
+    Hz_50       = 0b1001,
+    Hz_25       = 0b1010,
+    Hz_12p5     = 0b1011,
+    Hz_6p25     = 0b1100,
+    Hz_3p125    = 0b1101,
+    Hz_1p5625   = 0b1110,
+    
 }
 
 impl DataRate {
+    pub fn from_raw(bits:u8) -> Self {
+        match bits {
+            0b0001  => DataRate::Hz_32000  ,
+            0b0010  => DataRate::Hz_16000  ,
+            0b0011  => DataRate::Hz_8000   ,
+            0b0100  => DataRate::Hz_4000   ,
+            0b0101  => DataRate::Hz_2000   ,
+            0b0110  => DataRate::Hz_1000   ,
+            0b1111  => DataRate::Hz_500    ,
+            0b0111  => DataRate::Hz_200    ,
+            0b1000  => DataRate::Hz_100    ,
+            0b1001  => DataRate::Hz_50     ,
+            0b1010  => DataRate::Hz_25     ,
+            0b1011  => DataRate::Hz_12p5   ,
+            0b1100  => DataRate::Hz_6p25   ,
+            0b1101  => DataRate::Hz_3p125  ,
+            0b1110  => DataRate::Hz_1p5625 ,
+            _ => unreachable!(),
+        }
+    }
+
     pub const fn bits(self) -> u8 {
         self as u8
     }
 
     pub const fn sample_rate(self) -> f32 {
         match self {
-            DataRate::Hz_26700 => 26700.0,
-            DataRate::PowerDown => 0.0,
+            DataRate::Hz_32000  => 32000.0,
+            DataRate::Hz_16000  => 16000.0,
+            DataRate::Hz_8000   => 8000.0,
+            DataRate::Hz_4000   => 4000.0,
+            DataRate::Hz_2000   => 2000.0,
+            DataRate::Hz_1000   => 1000.0,
+            DataRate::Hz_500    => 500.0,
+            DataRate::Hz_200    => 200.0,
+            DataRate::Hz_100    => 100.0,
+            DataRate::Hz_50     => 50.0,
+            DataRate::Hz_25     => 25.0,
+            DataRate::Hz_12p5   => 12.50,
+            DataRate::Hz_6p25   => 6.250,
+            DataRate::Hz_3p125  => 3.1250,
+            DataRate::Hz_1p5625 => 1.5625,
         }
     }
 }
@@ -249,8 +401,6 @@ impl Timestamp {
        (self.raw() as f32) * 1f32 / (80000f32 + (0.0015 * odr.raw() as f32 * 80000f32))
     }
 }
-
-
 
 
 // TODO: Repurpose tis with FIFO Statuses.
@@ -306,71 +456,30 @@ pub enum Mode {
 // === WHO_AMI_I (0Fh) ===
 
 /// `WHO_AM_I` device identification register
-pub const DEVICE_ID: u8 = 0x7B;
+pub const DEVICE_ID: u8 = 0x6F;
 
-// === CTRL1_XL (10h) ===
+// DEVICE CONFIG
+pub const SOFT_RESET_CONFIG:u8 = 0b0000_0001;
 
-pub const XL_EN_MASK: u8 = 0b1110_0000;
-pub const FS_EN_MASK: u8 = 0b0000_1100;
-pub const LPF2_EN: u8 = 0b0000_0010;
+// REG_BANK_SEL
+pub const MASK_BANK_SEL:u8 = 0b0000_0111;
 
-// === CTRL3_C (12h) ===
-
-pub const BOOT: u8 = 0b1000_0000;
-pub const BDU: u8 = 0b0100_0000;
-pub const H_LACTIVE: u8 = 0b0010_0000;
-pub const PP_OD: u8 = 0b0001_0000;
-pub const SIM: u8 = 0b0000_1000;
-pub const IF_INC: u8 = 0b0000_0100;
-pub const SW_RESET: u8 = 0b0000_0001;
-
-// === CTRL4_C (13h) ===
-pub const INT2_ON_INT1: u8 = 0b0010_0000;
-pub const DRDY_MASK: u8 = 0b0000_1000;
-pub const I2C_DISABLE: u8 = 0b0000_0100;
-pub const ONE_AX_TO_3REGOUT: u8 = 0b0000_0001; //Actual name 1AX_TO_3REGOUT 
-
-// === CTRL5_C (14h) ===
-
-pub const ROUNDING_EN: u8 = 0b00100000;
-pub const SELFTEST_MASK: u8 = 0b00000011;
+// PWR_MGMT0
+pub const MASK_ACCEL_MODE:u8 = 0b0000_0011;
+pub const MASK_GYRO_MODE:u8 = 0b0000_1100;
+pub const IDLE:u8 = 0b0001_0000;
+pub const TEMP_DIS:u8 = 0b0010_0000;
 
 
-// === CTRL6_C (15h) ===
+// GYRO_CONFIG0
+pub const MASK_GYRO_ODR: u8 = 0b0000_1111;
+pub const MASK_GYRO_UI_FS_SEL: u8 = 0b1110_0000;
 
-pub const USR_OFF_W: u8 = 0b00001000;
-pub const XL_AXIS_SEL_MASK: u8 = 0b00000011;
-
-// === CTRL7_C (16h) ===
-
-pub const USR_OFF_ON_OUT: u8 = 0b00000010;
-
-// === CTRL8_XL (17h) ===
-
-pub const HPCF_XL_MASK: u8 = 0b11100000;
-pub const HP_REF_MODE_XL: u8 = 0b00010000;
-pub const FASTSETTL_MODE_XL: u8 = 0b00001000;
-pub const FDS: u8 = 0b00000100;
+// ACCEL_CONFIG0
+pub const MASK_ACCEL_ODR: u8 = 0b0000_1111;
+pub const MASK_ACCEL_UI_FS_SEL: u8 = 0b1110_0000;
 
 
-// === CTRL7_C (16h) ===
-pub const TIMESTAMP_EN: u8 = 0b00100000;
-
-
-// === INTERRUPTS_EN (58h) ===
-pub const INTERRUPTS_EN: u8 = 0b1000_0000;
-
-// === FIFO_CTRL4 (0Ah) ===
-pub const FIFO_MODE_MASK: u8 = 0b0000_0111;
-pub const DEC_TS_MASK: u8 = 0b1100_0000;
-pub const ODR_T_MASK: u8 = 0b0011_0000;
-
-// === FIFO_CTRL3 (0Ah) ===
-pub const BDR_XL_MASK: u8 = 0b0000_1111;
-
-
-// === FIFO_CTRL2 (0Ah) ===
-pub const STOP_ON_WTM: u8 = 0b1000_0000;
-pub const FIFO_WTM8: u8 = 0b0000_0001;
-
-
+// BANK 3 
+// PU_PD_CONFIG2
+pub const PIN1_PU_EN:u8 = 0b1000_0000;
