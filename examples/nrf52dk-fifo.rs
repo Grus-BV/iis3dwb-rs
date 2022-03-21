@@ -46,8 +46,64 @@ pub fn exit() -> ! {
 
 #[embassy::main]
 async fn main(spawner: Spawner, mut p: Peripherals){
+    defmt::info!("Hello World!");
+{    let mut config = spim::Config::default();
+    config.frequency = spim::Frequency::M32;
 
-    // defmt::info!("FLASH ACTIVE");
+
+    let mut irq = interrupt::take!(SPIM3);
+    let mut spim = spim::Spim::new( &mut p.SPI3, 
+                                                    &mut irq, 
+                                                    &mut p.P0_19,
+                                                    &mut p.P0_21,
+                                                    &mut p.P0_20,
+                                                    config);
+
+    let mut ncs = Output::new(&mut p.P0_17, Level::High, OutputDrive::Standard);
+
+    let mut rx = [0; 3];
+        cortex_m::asm::delay(5000);
+        ncs.set_low();
+        cortex_m::asm::delay(50);
+        let tx = [0x15, 0, 0];
+        unwrap!(spim.blocking_transfer(&mut rx, &tx));
+        cortex_m::asm::delay(50);
+        ncs.set_high();
+        info!("rdcr: {=[u8]:b}", rx);
+        cortex_m::asm::delay(10000);
+
+        let mut rx = [0; 3];
+        cortex_m::asm::delay(5000);
+        ncs.set_low();
+        cortex_m::asm::delay(50);
+        let tx = [0x05, 0, 0];
+        unwrap!(spim.blocking_transfer(&mut rx, &tx));
+        cortex_m::asm::delay(50);
+        ncs.set_high();
+        info!("status: {=[u8]:b}", rx);
+        cortex_m::asm::delay(10000);
+
+        let mut rx = [0; 3];
+        cortex_m::asm::delay(5000);
+        ncs.set_low();
+        cortex_m::asm::delay(50);
+        let tx = [0x01, 0x00, 0x00];
+        unwrap!(spim.blocking_transfer(&mut rx, &tx));
+        ncs.set_high();
+        info!("status_write: {=[u8]:b}", rx);
+        cortex_m::asm::delay(10000);
+
+        let mut rx = [0; 3];
+        cortex_m::asm::delay(5000);
+        ncs.set_low();
+        cortex_m::asm::delay(50);
+        let tx = [0x05, 0, 0];
+        unwrap!(spim.blocking_transfer(&mut rx, &tx));
+        cortex_m::asm::delay(50);
+        ncs.set_high();
+        info!("status: {=[u8]:b}", rx);
+        cortex_m::asm::delay(100000);}
+        
     // let mut config = qspi::Config::default();
     // config.read_opcode = qspi::ReadOpcode::READ4IO;
     // config.write_opcode = qspi::WriteOpcode::PP4IO;
