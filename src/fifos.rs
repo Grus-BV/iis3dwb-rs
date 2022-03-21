@@ -1,185 +1,158 @@
 use crate::register::*;
-use core::convert::TryInto;
+use core::{convert::TryInto, str::ParseBoolError};
 use super::SPI_READ;
-use crate::{IIS3DWB, spi, OutputPin};
+use crate::{IIM42652, spi, OutputPin};
+use modular_bitfield::prelude::*;
 
-// 
-// In IIS3DWB, Interrupts are distinct from Wake up sources
-// Therefore, we need to implement a wake up lib. 
-// 
-
-
-// Is this crazy? W8 is at one register and W[7:0] at another.
-#[derive(Debug, Copy, Clone)]
-pub struct Watermark{
-    lsb: u8,
-    hsb: bool,
+#[derive(BitfieldSpecifier,Clone, Copy, Debug)]
+#[bits = 2]
+pub enum TimestampType {
+    NoTstamp = 0b00,
+    None,
+    OdrTstamp = 0b10,
+    FsyncTstamp = 0b11,
 }
 
-// Cannot be higher than the FIFO size, 3000 bytes.
-impl Watermark {
-    pub fn from_bytes(watermark_u16: u16) -> Self {
-        Self{
-            lsb: watermark_u16 as u8, 
-            hsb:((watermark_u16 >> 8) != 0) as bool,
-        }
+#[bitfield(bits = 8)]
+#[derive(Copy, Clone, Debug)]
+pub struct Header {
+    odr_gyro_different:bool,
+    odr_accel_different:bool,
+    #[bits = 2]
+    timestamp_type: TimestampType,
+    extended_20bit_data: bool,
+    gyro_available: bool,
+    accel_available: bool,
+    fifo_is_empty:bool,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct AccelPacket {
+    header:Header,
+    accel_x_l: u8,
+    accel_x_h: u8,
+    accel_y_l: u8,
+    accel_y_h: u8,
+    accel_z_l: u8,
+    accel_z_h: u8,
+    temp: u8,
+}
+
+#[bitfield(bits = 16)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct Watermark {
+    watermark: B12,
+    #[skip] __: B4,
+}
+
+/// Default watermark thresold is 2000 bytes
+impl Default for Watermark {
+    fn default () -> Self {
+        Self::new().with_watermark(0x7d0) 
     }
 }
 
-
+#[bitfield(bits=8)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-#[repr(u8)]
-pub enum FifoTimestampDecimation {
-    Omitted = 0b00,
-    Decimation1 = 0b01,
-    Decimation8 = 0b10,
-    Decimation32 = 0b11,
+pub struct FifoConfigReg {
+    pub accel_en: bool,
+    pub gyro_en: bool,
+    pub temp_en: bool,
+    pub timestamp_fsync_en: bool,
+    pub hi_resolution_en: bool,
+    pub watermark_interrupt_en: bool,
+    pub resume_partial_read_en: bool,
+    #[skip] __: B1
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-#[repr(u8)]
-pub enum FifoAccBatchDataRate {
-    Omitted = 0b0000,
-    BDR26667Hz = 0b1010,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-#[repr(u8)]
-pub enum FifoTempBatchDataRate {
-    Omitted = 0b00,
-    BDR104Hz   = 0b11,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-#[repr(u8)]
-pub enum FifoMode{
-    Disabled = 0b000,
-    FifoMode = 0b001,
-    ContinuousToFifo = 0b011,
-    BypassToContinuous = 0b100,
-    Continuous = 0b110,
-    BypassToFifo = 0b111,
-}
-impl FifoMode {
-    pub const fn raw(self) -> u8 {
-        self as u8
-    }
- }
-
-
-#[derive(Debug, Copy, Clone)]
-pub struct FifoConfig
-{
-    pub mode: FifoMode,
-    pub watermark:Watermark,
-    pub stop_in_watermark: bool,
-    pub temperature: FifoTempBatchDataRate,
-    pub timestamp: FifoTimestampDecimation,
-    pub acceleration: FifoAccBatchDataRate
-}
-
-impl Default for FifoConfig {
+/// Any functionality needed should be enabled explicitly.
+impl Default for FifoConfigReg {
     fn default() -> Self {
-        Self{
-            mode: FifoMode::Disabled,
-            watermark:Watermark::from_bytes(0u16),
-            stop_in_watermark:false,
-            temperature: FifoTempBatchDataRate::Omitted,
-            timestamp: FifoTimestampDecimation::Omitted,
-            acceleration: FifoAccBatchDataRate::Omitted,
-        }
+        Self::new()
+            .with_accel_en(false)
+            .with_gyro_en(false)
+            .with_temp_en(false)
+            .with_timestamp_fsync_en(false)
+            .with_hi_resolution_en(false)
+            .with_watermark_interrupt_en(false)
+            .with_resume_partial_read_en(false)
     }
 }
 
-impl FifoConfig {
-    fn as_registers(&self) -> [u8;4] {
-        let mut registers = [0;4];
-        registers[0] = self.watermark.lsb as u8;
-        registers[1] = self.watermark.hsb as u8 & FIFO_WTM8 + 
-                       (self.stop_in_watermark as u8) << 7 & STOP_ON_WTM ;
-        registers[2] = self.acceleration as u8;
-        registers[3] = (self.mode as u8 & FIFO_MODE_MASK) + ((self.temperature as u8) << 4  & ODR_T_MASK) + ((self.timestamp as u8) << 6 & DEC_TS_MASK) ;
+#[derive(Copy, Clone, Debug, Eq, PartialEq, BitfieldSpecifier)]
+#[bits=2]
+pub enum FifoMode {
+    Bypass = 0b00,
+    StreamToFifo = 0b01,
+    StopOnFull = 0b10,
+    None,
+}
 
-        registers
-    }
-    fn from_registers(&self, registers: &[u8;4]) {
+impl Default for FifoMode {
+    fn default() -> Self {
+        Self::Bypass
     }
 }
 
+#[bitfield(bits=8)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+pub struct FifoConfigMode {
+    #[skip] __: B6,
+    mode: FifoMode,
+}
 
-impl <SPI,CS,E,PinError> IIS3DWB <SPI,CS>
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+pub struct FifoConfig {
+    pub mode:FifoMode,
+    pub watermark: Watermark,
+    pub config_reg: FifoConfigReg,
+}
+
+#[repr(u16)]
+#[bitfield(bits=16)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+pub struct FifoCount {
+    count_lsb: B8,
+    count_hsb: B8,
+}
+
+impl <SPI,CS,E,PinError> IIM42652 <SPI,CS>
 where 
     SPI: spi::Transfer<u8, Error=E> + spi::Write<u8, Error=E>,
     CS: OutputPin <Error= PinError>
 {
     pub fn configure_fifo(&mut self, config: FifoConfig){
-        let registers = config.as_registers();
-        self.write_reg(Register::FIFO_CTRL_1.addr(),registers[0]); //
-        self.write_reg(Register::FIFO_CTRL_2.addr(),registers[1]); //
-        self.write_reg(Register::FIFO_CTRL_3.addr(),registers[2]); //
-        self.write_reg(Register::FIFO_CTRL_4.addr(),registers[3]); //
+        self.write_reg(Register::FIFO_CONFIG1.addr(),config.config_reg.into_bytes()[0]); //
+        self.write_reg(Register::FIFO_CONFIG2.addr(),config.watermark.into_bytes()[0]); //
+        self.write_reg(Register::FIFO_CONFIG3.addr(),config.watermark.into_bytes()[1]); //
     }
     pub fn get_config(&self) -> FifoConfig{
         todo!();        
     }
-    pub fn set_fifo_mode(&mut self, mode: FifoMode){
-        self.modify_register(Register::FIFO_CTRL_4.addr(), 
-                                  FIFO_MODE_MASK, 
-                              mode.raw());
-    }
     pub fn set_watermark(&mut self, watermark:Watermark){
-        self.write_reg(Register::FIFO_CTRL_1.addr(), 
-                        watermark.lsb as u8);
-        self.modify_register(Register::FIFO_CTRL_2.addr(), 
-                            FIFO_WTM8, 
-                            watermark.hsb as u8);   
+        self.write_reg(Register::FIFO_CONFIG2.addr(),watermark.into_bytes()[0]); //
+        self.write_reg(Register::FIFO_CONFIG3.addr(),watermark.into_bytes()[1]); //
     }
     pub fn flush_fifo(&mut self){
        // changes mode to Bypass 
         todo!();
     }
-    pub fn unread_data_count(&mut self) -> u16 {
-        let mut buffer1 = [0u8;1]; 
-        let mut buffer2 = [0u8;1];  
-        self.read_reg(Register::FIFO_STATUS1.addr(),
-                        &mut buffer1);
-        self.read_reg(Register::FIFO_STATUS2.addr(),
-                &mut buffer2);
-        buffer1[0] as u16 + (((buffer2[0] & 0b0000_0011) as u16) << 8)
+    pub fn unread_data_count(&mut self) -> FifoCount {
+        let mut buffer = [0u8;2];  
+        self.read_reg(Register::FIFO_COUNTL.addr(),
+                &mut buffer);
+        FifoCount::from_bytes(buffer)
     }
-    pub fn watermark_exceeded(&mut self) -> bool {
-        let mut buffer = [0u8];  // Chip increments address for the second
-        self.read_reg(Register::FIFO_STATUS1.addr(),
-                        &mut buffer);
-        (buffer[0] >> 7) == 1
-    }
+
     pub fn overrun(&self) -> bool {
         // fifo status 2
         todo!();
     }
-    pub fn fifo_statuses(&mut self) -> (u8,u8) {
-        let mut buffer1 = [0u8;1]; 
-        let mut buffer2 = [0u8;1];  
-        self.read_reg(Register::FIFO_STATUS1.addr(),
-                        &mut buffer1);
-        self.read_reg(Register::FIFO_STATUS2.addr(),
-                        &mut buffer2);
-        (buffer1[0],buffer2[0])
-    }
-    pub fn fifo_read(&mut self) -> [u8;3500] {
-        let mut bytes =  [0u8;3501];
-        bytes[0] = Register::FIFO_DATA_OUT_TAG.addr() | SPI_READ;
+ 
+    pub fn fifo_read(&mut self) -> [u8;2000] {
+        let mut bytes =  [0u8;2001];
+        bytes[0] = Register::FIFO_DATA.addr() | SPI_READ;
         self.read(&mut bytes);
-        bytes[1..3501].try_into().unwrap() // this copies
+        bytes[1..2001].try_into().unwrap() // this copies
     }
-    // pub fn fifo_read_to_buffer(&mut self, buffer: &mut [u8]) -> Result<(),Error> {
-    //     todo!();
-    //     let mut bytes =  [0u8;701];
-    //     bytes[0] = Register::FIFO_DATA_OUT_TAG.addr() | SPI_READ;
-    //     self.read(&mut bytes);
-    //     bytes[1..701].try_into().unwrap(); // this copies
-
-    //     Ok(())
-    // }
-
 } 

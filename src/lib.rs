@@ -3,7 +3,7 @@
 mod register;
 //mod interrupts;
 mod wakeups;
-//mod fifos;   
+mod fifos;   
 
 /// Is there a way to improve this to non blocking? Does that require async? 
 pub use embedded_hal::blocking::spi;
@@ -22,12 +22,9 @@ use core::ops::Index;
 use micromath::generic_array::{arr, GenericArray, typenum::U3};
 
 
-// use fifos::{FifoConfig};
-// pub use fifos::{FifoAccBatchDataRate,
-//                 FifoMode,
-//                 FifoTempBatchDataRate,
-//                 FifoTimestampDecimation,
-//                 Watermark};
+pub use fifos::{FifoConfig,
+                FifoMode,
+                Watermark};
 // use interrupts::{Interrupt1, Interrupt2};
 // use wakeups::{WakeUp};
 pub use register::{Bank, DataRate, Mode, Range, Register, Register_3, Register_1,
@@ -45,6 +42,7 @@ use register::{DEVICE_ID,
                 PIN1_PU_EN,
                 TMST_EN,
                 TMST_TO_REGS_EN,
+                TMST_STROBE,
             };
 
 use core::fmt::Debug;
@@ -114,6 +112,7 @@ where
             // raise
         }
         IIM42652.set_range(IIM42652.range);
+        IIM42652.set_data_rate(config.datarate);
         // IIM42652.set_timestamp_en(true);
         // IIM42652.configure_fifo(IIM42652.fifo);
         // IIM42652.set_interrupt_1(IIM42652.interrupt1);
@@ -164,9 +163,17 @@ where
     }
 
     pub fn set_range(&mut self, range: Range) {
+        defmt::info!("ODR bits:{=u8:b}", range.bits());
         self.modify_register( Register::ACCEL_CONFIG0.addr(), 
                                 MASK_ACCEL_UI_FS_SEL, 
                               range.bits()).unwrap();
+    }
+
+    pub fn set_data_rate(&mut self, odr: DataRate) {
+        defmt::info!("ODR bits:{=u8:b}",odr.bits());
+        self.modify_register( Register::ACCEL_CONFIG0.addr(), 
+                                MASK_ACCEL_ODR, 
+                              odr.bits()).unwrap();
     }
 
     pub fn disable_i2c(&mut self) {
@@ -263,10 +270,17 @@ where
     }
 
     pub fn get_timestamp (&mut self) -> Timestamp {
-        let mut bytes = [0u8; 2+1];
+        self.modify_register( Register::SIGNAL_PATH_RESET.addr(), 
+                             TMST_STROBE, 
+                              0x1).unwrap();
+        self.switch_reg_bank(Bank::Bank1);
+        let mut bytes = [0u8; 3+1];
         bytes[0] = Register_1::TMSTVAL0.addr() | SPI_READ;
         self.read(&mut bytes);
-        let tstamp = bytes[1] as u32 + (bytes[2] as u32) * 256;
+        self.switch_reg_bank(Bank::Bank0);
+        let tstamp = bytes[1] as u32 + 
+                        (bytes[2] as u32) * 0x100+
+                        ((bytes[3] & 0b0000_1111) as u32) * 0x10000;
         Timestamp(tstamp)
     }
 
@@ -295,9 +309,9 @@ where
         bytes[0] = Register::ACCEL_DATA_X1_UI.addr() | SPI_READ;
         self.read(&mut bytes);
 
-        let x_u16 = bytes[1] as u16 + (bytes[2] as u16) * 256;
-        let y_u16 = bytes[3] as u16 + (bytes[4] as u16) * 256;
-        let z_u16 = bytes[5] as u16 + (bytes[6] as u16) * 256;
+        let x_u16 = bytes[2] as u16 + (bytes[1] as u16) * 256;
+        let y_u16 = bytes[4] as u16 + (bytes[3] as u16) * 256;
+        let z_u16 = bytes[6] as u16 + (bytes[5] as u16) * 256;
 
         let x = x_u16 as i16;
         let y = y_u16 as i16;
@@ -439,9 +453,9 @@ where
         bytes[0] = Register::ACCEL_DATA_X1_UI.addr() | SPI_READ;
         self.read(&mut bytes);
 
-        let x = (bytes[1] as u16 + (bytes[2] as u16) * 256 ) as i16;
-        let y = (bytes[3] as u16 + (bytes[4] as u16) * 256 ) as i16;
-        let z = (bytes[5] as u16 + (bytes[6] as u16) * 256 ) as i16;
+        let x = (bytes[2] as u16 + (bytes[1] as u16) * 256 ) as i16;
+        let y = (bytes[4] as u16 + (bytes[3] as u16) * 256 ) as i16;
+        let z = (bytes[6] as u16 + (bytes[5] as u16) * 256 ) as i16;
 
         let t = self.get_timestamp();
         

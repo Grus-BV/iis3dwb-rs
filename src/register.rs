@@ -494,6 +494,9 @@ pub const MASK_GYRO_UI_FS_SEL: u8 = 0b1110_0000;
 pub const MASK_ACCEL_ODR: u8 = 0b0000_1111;
 pub const MASK_ACCEL_UI_FS_SEL: u8 = 0b1110_0000;
 
+// SIGNAL_PATH_RESET
+pub const TMST_STROBE: u8 = 0b0000_0100;
+
 // TMST_CONFIG
 pub const TMST_TO_REGS_EN: u8 = 0b0001_0000;
 pub const TMST_RES: u8 = 0b0000_1000;
@@ -505,4 +508,3 @@ pub const TMST_EN: u8 = 0b0000_0001;
 // BANK 3 
 // PU_PD_CONFIG2
 pub const PIN1_PU_EN:u8 = 0b1000_0000;
-
