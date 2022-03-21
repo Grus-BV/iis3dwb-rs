@@ -163,7 +163,7 @@ where
     }
 
     pub fn set_range(&mut self, range: Range) {
-        defmt::info!("ODR bits:{=u8:b}", range.bits());
+        defmt::info!("RANGE bits:{=u8:b}", range.bits());
         self.modify_register( Register::ACCEL_CONFIG0.addr(), 
                                 MASK_ACCEL_UI_FS_SEL, 
                               range.bits()).unwrap();
