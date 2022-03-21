@@ -73,6 +73,8 @@ fn main() -> ! {
     let mut accelerometer = IIM42652::new(spi, ncs, &acc_cfg).unwrap();
     let id = accelerometer.get_device_id();
     defmt::info!("The device ID is: 0x{=u8:x}", id);
+    accelerometer.set_timestamp_en(true);
+
     // let temp = accelerometer.read_temp_raw();
     // defmt::info!("The device temperature is: 0x{=u16:x}", temp);
 
@@ -82,8 +84,10 @@ fn main() -> ! {
         cortex_m::asm::delay(25_000_000);   // KISS.
         let acc  = accelerometer.accel_norm().unwrap();
         let odr  = accelerometer.sample_rate().unwrap();
-        //let tstamp   = accelerometer.get_timestamp();
-        defmt::info!("{} gs,{} gs,{} gs,{} Hz",acc.x,acc.y,acc.z,odr);
+        
+        accelerometer.set_timestamp_en(true);
+        let tstamp = accelerometer.get_timestamp();
+        defmt::info!("{} gs,{} gs,{} gs,{} Hz, {} Tstamp",acc.x,acc.y,acc.z,odr,tstamp.raw());
     }
 
     exit();
