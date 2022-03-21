@@ -47,8 +47,9 @@ pub fn exit() -> ! {
 #[embassy::main]
 async fn main(spawner: Spawner, mut p: Peripherals){
     defmt::info!("Hello World!");
-{    let mut config = spim::Config::default();
-    config.frequency = spim::Frequency::M32;
+{    
+    let mut config = spim::Config::default();
+    config.frequency = spim::Frequency::M1;
 
 
     let mut irq = interrupt::take!(SPIM3);
@@ -60,6 +61,10 @@ async fn main(spawner: Spawner, mut p: Peripherals){
                                                     config);
 
     let mut ncs = Output::new(&mut p.P0_17, Level::High, OutputDrive::Standard);
+    let mut wp_n = Output::new(&mut p.P0_22, Level::High, OutputDrive::Standard);
+
+
+   
 
     let mut rx = [0; 3];
         cortex_m::asm::delay(5000);
@@ -83,6 +88,30 @@ async fn main(spawner: Spawner, mut p: Peripherals){
         info!("status: {=[u8]:b}", rx);
         cortex_m::asm::delay(10000);
 
+        let mut rx = [0; 1];
+        cortex_m::asm::delay(5000);
+        ncs.set_low();
+        cortex_m::asm::delay(50);
+        let tx = [0x06];
+        unwrap!(spim.blocking_transfer(&mut rx, &tx));
+        cortex_m::asm::delay(50);
+        ncs.set_high();
+        info!("WREN!");
+        cortex_m::asm::delay(10000);
+
+        
+        let mut rx = [0; 3];
+        cortex_m::asm::delay(5000);
+        ncs.set_low();
+        cortex_m::asm::delay(50);
+        let tx = [0x05, 0, 0];
+        unwrap!(spim.blocking_transfer(&mut rx, &tx));
+        cortex_m::asm::delay(50);
+        ncs.set_high();
+        info!("status: {=[u8]:b}", rx);
+        cortex_m::asm::delay(10000);
+    
+
         let mut rx = [0; 3];
         cortex_m::asm::delay(5000);
         ncs.set_low();
@@ -102,7 +131,28 @@ async fn main(spawner: Spawner, mut p: Peripherals){
         cortex_m::asm::delay(50);
         ncs.set_high();
         info!("status: {=[u8]:b}", rx);
-        cortex_m::asm::delay(100000);}
+        
+        cortex_m::asm::delay(100000);
+        let mut rx = [0; 1];
+        cortex_m::asm::delay(5000);
+        ncs.set_low();
+        cortex_m::asm::delay(50);
+        let tx = [0x66];
+        unwrap!(spim.blocking_transfer(&mut rx, &tx));
+        cortex_m::asm::delay(50);
+        ncs.set_high();
+        info!("RESETEN!");
+        let mut rx = [0; 1];
+        cortex_m::asm::delay(5000);
+        ncs.set_low();
+        cortex_m::asm::delay(50);
+        let tx = [0x99];
+        unwrap!(spim.blocking_transfer(&mut rx, &tx));
+        cortex_m::asm::delay(50);
+        ncs.set_high();
+        info!("RESET!");
+    
+    }
         
     // let mut config = qspi::Config::default();
     // config.read_opcode = qspi::ReadOpcode::READ4IO;
@@ -167,70 +217,70 @@ async fn main(spawner: Spawner, mut p: Peripherals){
     // let after = Instant::now().as_ticks();
     // info!("took {} ticks", after-before); 
 
-        let mut config = spim::Config::default();
-        config.frequency = spim::Frequency::M32;
+    //     let mut config = spim::Config::default();
+    //     config.frequency = spim::Frequency::M32;
     
 
-        let mut irq = interrupt::take!(SPIM3);
-        let mut spim = spim::Spim::new( &mut p.SPI3, 
-                                                        &mut irq, 
-                                                        &mut p.P0_13,
-                                                        &mut p.P0_16,
-                                                        &mut p.P0_15,
-                                                        config);
+    //     let mut irq = interrupt::take!(SPIM3);
+    //     let mut spim = spim::Spim::new( &mut p.SPI3, 
+    //                                                     &mut irq, 
+    //                                                     &mut p.P0_13,
+    //                                                     &mut p.P0_16,
+    //                                                     &mut p.P0_15,
+    //                                                     config);
 
-        let mut ncs = Output::new(&mut p.P0_14, Level::High, OutputDrive::Standard);
+    //     let mut ncs = Output::new(&mut p.P0_14, Level::High, OutputDrive::Standard);
         
-        defmt::info!("ACC CONFIG");        
+    //     defmt::info!("ACC CONFIG");        
 
-    let mut acc_cfg = IIM42652Config::default();
-    let mut accelerometer = IIM42652::new(spim, ncs, &acc_cfg).unwrap();
-    let id = accelerometer.get_device_id();
-    defmt::info!("The device ID is: 0x{=u8:x}", id);
+    // let mut acc_cfg = IIM42652Config::default();
+    // let mut accelerometer = IIM42652::new(spim, ncs, &acc_cfg).unwrap();
+    // let id = accelerometer.get_device_id();
+    // defmt::info!("The device ID is: 0x{=u8:x}", id);
     
-    let mut fifo_cfg = iim42652::FifoConfig::default();
-    fifo_cfg.mode = FifoMode::StreamToFifo;
-    fifo_cfg.config_reg
-            .with_accel_en(true)
-            .with_temp_en(true)
-            .with_timestamp_fsync_en(true)
-            .with_resume_partial_read_en(true);
-    accelerometer.configure_fifo(fifo_cfg);
-    cortex_m::asm::delay(5000000);   // KISS.
+    // let mut fifo_cfg = iim42652::FifoConfig::default();
+    // fifo_cfg.mode = FifoMode::StreamToFifo;
+    // fifo_cfg.config_reg
+    //         .with_accel_en(true)
+    //         .with_temp_en(true)
+    //         .with_timestamp_fsync_en(true)
+    //         .with_resume_partial_read_en(true);
+    // accelerometer.configure_fifo(fifo_cfg);
+    // cortex_m::asm::delay(5000000);   // KISS.
 
-    accelerometer.set_acc_mode(AccelerometerMode::LowNoise);
+    // accelerometer.set_acc_mode(AccelerometerMode::LowNoise);
     
-    let mut buffer =  AlignedBuf2000([0u8; 2000]);
-    let mut before_meas = Instant::now().as_ticks();
-    loop {
-        let mut fifo_level = accelerometer.unread_data_count();
-        if u16::from(fifo_level) > 2000 {
-            info!("fifo full, level: {}",u16::from(fifo_level));  
-            let before = Instant::now().as_ticks();
-            buffer.0 = accelerometer.fifo_read();
-            let after = Instant::now().as_ticks();
-            info!("measuring took {} ticks", after-before);  
-            let before = Instant::now().as_ticks();
-            unwrap!(q.write(0, &buffer.0).await);
-            let after = Instant::now().as_ticks();
-            info!("writing took {} ticks", after-before); 
+    // let mut buffer =  AlignedBuf2000([0u8; 2000]);
+    // let mut before_meas = Instant::now().as_ticks();
+    // loop {
+    //     let mut fifo_level = accelerometer.unread_data_count();
+    //     if u16::from(fifo_level) > 2000 {
+    //         info!("fifo full, level: {}",u16::from(fifo_level));  
+    //         let before = Instant::now().as_ticks();
+    //         buffer.0 = accelerometer.fifo_read();
+    //         let after = Instant::now().as_ticks();
+    //         info!("measuring took {} ticks", after-before);  
+    //         let before = Instant::now().as_ticks();
+    //         //unwrap!(q.write(0, &buffer.0).await);
+    //         let after = Instant::now().as_ticks();
+    //         info!("writing took {} ticks", after-before); 
         
-            let after_meas = Instant::now().as_ticks();
-            info!("duration of all measurement: {} ticks", after_meas-before_meas);
-            before_meas = Instant::now().as_ticks();
-            info!("fifo after meas, level: {}",u16::from(accelerometer.unread_data_count()));  
-        }
-        else{
-            cortex_m::asm::delay(5000);   // KISS.
-        }
-    }
+    //         let after_meas = Instant::now().as_ticks();
+    //         info!("duration of all measurement: {} ticks", after_meas-before_meas);
+    //         before_meas = Instant::now().as_ticks();
+    //         info!("fifo after meas, level: {}",u16::from(accelerometer.unread_data_count()));  
+    //     }
+    //     else{
+    //         cortex_m::asm::delay(5000);   // KISS.
+    //     }
+    // }
     
-    accelerometer.stop();
-    accelerometer.reset();
+    // accelerometer.stop();
+    // accelerometer.reset();
     
-    while accelerometer.resetting() {
-        cortex_m::asm::wfe();
-    }
+    // while accelerometer.resetting() {
+    //     cortex_m::asm::wfe();
+    // }
     defmt::info!("Resetted!");
 
    
