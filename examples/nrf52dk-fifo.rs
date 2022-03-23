@@ -74,11 +74,12 @@ async fn main(spawner: Spawner, mut p: Peripherals){
     // Read Config
     unwrap!(q.custom_instruction(0x66, &[], &mut []).await);
     unwrap!(q.custom_instruction(0x99, &[], &mut []).await);
+    cortex_m::asm::delay(5000000);   // KISS.
 
     // Read Config
-    let mut rdcr =  [0; 3];
+    let mut rdcr =  [0; 2];
     unwrap!(q.custom_instruction(0x15, &[], &mut rdcr).await);
-    info!("rdcr: {=[u8]:x}", rdcr);
+    info!("rdcr: {=[u8]:b}", rdcr);
     
     // Read ID
     let mut id = [0; 3];
@@ -86,17 +87,17 @@ async fn main(spawner: Spawner, mut p: Peripherals){
     info!("id: {=[u8]:x}", id);
 
     // Read status register
-    let mut status = [0; 1];
+    let mut status = [0; 2];
     unwrap!(q.custom_instruction(0x05, &[], &mut status).await);
-    info!("status: {:x}", status[0]);
+    info!("status: {:b}", status);
     
     unwrap!(q.custom_instruction(0x06, &[], &mut []).await);
     info!("WREN!");
     
     // Read status register
-    let mut status = [0; 1];
+    let mut status = [0; 2];
     unwrap!(q.custom_instruction(0x05, &[], &mut status).await);
-    info!("status: {:x}", status[0]);
+    info!("status: {:b}", status);
 
 
     let mut status_and_rdcr = [status[0],rdcr[0]];

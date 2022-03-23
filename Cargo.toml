@@ -4,13 +4,13 @@ description = "An embedded-hal driver for the IIS3DWB accelerometer that impleme
 version = "0.1.0"
 license = "Apache-2.0 OR MIT"
 authors = [
-    "Mehmet Ali Anil <nehmet@grusbv.com>"
+    "Mehmet Ali Anil <mehmet@grusbv.com>"
 ]
 keywords = [
     "embedded-hal-driver",
     "accelerometer",
 ]
-repository = "https://github.com/Grus-BV/iis3dwb-rs"
+repository = "https://github.com/Grus-BV/iim42652-rs"
 edition = "2018"
 
 [features]
@@ -18,7 +18,10 @@ board_alpha = []
 # set logging levels here
 default = [
 "board_alpha",
+"nightly",
 ]
+nightly = ["embassy-nrf/nightly", "embassy-nrf/unstable-traits"]
+
 
 [patch.crates-io]
 embassy = { git = "https://github.com/embassy-rs/embassy" }
