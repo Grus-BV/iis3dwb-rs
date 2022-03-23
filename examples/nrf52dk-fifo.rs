@@ -147,11 +147,10 @@ async fn main(spawner: Spawner, mut p: Peripherals){
     let mut fifo_cfg = iim42652::FifoConfig::default();
     fifo_cfg.mode = FifoMode::StopOnFull ;
     defmt::info!("Configuring FIFO");
-    fifo_cfg.config_reg 
-            .set_accel_en(true)
-            .set_temp_en(true)
-            .set_timestamp_fsync_en(true)
-            .set_resume_partial_read_en(true);
+    fifo_cfg.config_reg.set_accel_en(true);
+    fifo_cfg.config_reg.set_temp_en(true);
+    fifo_cfg.config_reg.set_timestamp_fsync_en(true);
+    fifo_cfg.config_reg.set_resume_partial_read_en(true);
     defmt::info!("with bytes {=[u8]}", (fifo_cfg.into_bytes()));
 
     accelerometer.configure_fifo(fifo_cfg);
