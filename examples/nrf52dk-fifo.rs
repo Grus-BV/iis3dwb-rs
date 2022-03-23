@@ -28,7 +28,7 @@ const PAGE_SIZE: usize = 4096;
 #[repr(C, align(4))]
 struct AlignedBuf([u8; 4096]);
 #[repr(C, align(4))]
-struct AlignedBuf2000([u8; 2000]);
+struct AlignedBuf2000([u8; 1400]);
 
 
 use panic_probe as _;
@@ -145,25 +145,25 @@ async fn main(spawner: Spawner, mut p: Peripherals){
     defmt::info!("The device ID is: 0x{=u8:x}", id);
     
     let mut fifo_cfg = iim42652::FifoConfig::default();
-    fifo_cfg.mode = FifoMode::StopOnFull ;
+    //abomination fix naming
+    fifo_cfg.mode.set_mode(FifoMode::StopOnFull);
     defmt::info!("Configuring FIFO");
     fifo_cfg.config_reg.set_accel_en(true);
     fifo_cfg.config_reg.set_temp_en(true);
     fifo_cfg.config_reg.set_timestamp_fsync_en(true);
     fifo_cfg.config_reg.set_resume_partial_read_en(true);
-    defmt::info!("with bytes {=[u8]}", (fifo_cfg.into_bytes()));
+    defmt::info!("with bytes {=[u8]:b}", (fifo_cfg.config_reg.into_bytes()));
 
     accelerometer.configure_fifo(fifo_cfg);
     cortex_m::asm::delay(5000000);   // KISS.
 
     accelerometer.set_acc_mode(AccelerometerMode::LowNoise);
     
-    let mut buffer =  AlignedBuf2000([0u8; 2000]);
+    let mut buffer =  AlignedBuf2000([0u8; 1400]);
     let mut before_meas = Instant::now().as_ticks();
     loop {
         let mut fifo_level = accelerometer.unread_data_count();
-        info!("fifo level: {}",u16::from(fifo_level));  
-        if u16::from(fifo_level) > 2000 {
+        if u16::from(fifo_level) > 1400 {
             info!("fifo full, level: {}",u16::from(fifo_level));  
             let before = Instant::now().as_ticks();
             buffer.0 = accelerometer.fifo_read();
@@ -179,7 +179,7 @@ async fn main(spawner: Spawner, mut p: Peripherals){
             info!("fifo after meas, level: {}",u16::from(accelerometer.unread_data_count()));  
         }
         else{
-            cortex_m::asm::delay(5000000);   // KISS.
+            cortex_m::asm::delay(5000);   // KISS.
         }
     }
     

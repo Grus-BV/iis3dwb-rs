@@ -98,7 +98,7 @@ impl Default for FifoMode {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
 pub struct FifoConfigMode {
     #[skip] __: B6,
-    mode: FifoMode,
+    pub mode: FifoMode,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
@@ -147,7 +147,6 @@ where
                 &mut buffer_l);  
         self.read_reg(Register::FIFO_COUNTH.addr(),
                 &mut buffer_h);
-        defmt::info!("{}",[buffer_l[0],buffer_h[0]]);
         FifoCount::from_bytes([buffer_l[0],buffer_h[0]])
     }
 
@@ -156,10 +155,10 @@ where
         todo!();
     }
  
-    pub fn fifo_read(&mut self) -> [u8;2000] {
-        let mut bytes =  [0u8;2001];
+    pub fn fifo_read(&mut self) -> [u8;1400] {
+        let mut bytes =  [0u8;1401];
         bytes[0] = Register::FIFO_DATA.addr() | SPI_READ;
         self.read(&mut bytes);
-        bytes[1..2001].try_into().unwrap() // this copies
+        bytes[1..1401].try_into().unwrap() // this copies
     }
 } 
