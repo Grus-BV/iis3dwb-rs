@@ -103,7 +103,7 @@ pub struct FifoConfigMode {
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
 pub struct FifoConfig {
-    pub mode:FifoMode,
+    pub mode:FifoConfigMode,
     pub watermark: Watermark,
     pub config_reg: FifoConfigReg,
 }
@@ -125,6 +125,7 @@ where
         self.write_reg(Register::FIFO_CONFIG1.addr(),config.config_reg.into_bytes()[0]); //
         self.write_reg(Register::FIFO_CONFIG2.addr(),config.watermark.into_bytes()[0]); //
         self.write_reg(Register::FIFO_CONFIG3.addr(),config.watermark.into_bytes()[1]); //
+        self.write_reg(Register::FIFO_CONFIG.addr(),config.mode.into_bytes()[0]); //
     }
     pub fn get_config(&self) -> FifoConfig{
         todo!();        
@@ -137,11 +138,17 @@ where
        // changes mode to Bypass 
         todo!();
     }
+
+    // here, burst reading did not work.
     pub fn unread_data_count(&mut self) -> FifoCount {
-        let mut buffer = [0u8;2];  
+        let mut buffer_l = [0xaau8];  
+        let mut buffer_h = [0xaau8];  
         self.read_reg(Register::FIFO_COUNTL.addr(),
-                &mut buffer);
-        FifoCount::from_bytes(buffer)
+                &mut buffer_l);  
+        self.read_reg(Register::FIFO_COUNTH.addr(),
+                &mut buffer_h);
+        defmt::info!("{}",[buffer_l[0],buffer_h[0]]);
+        FifoCount::from_bytes([buffer_l[0],buffer_h[0]])
     }
 
     pub fn overrun(&self) -> bool {
