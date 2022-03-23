@@ -104,11 +104,10 @@ async fn main(spawner: Spawner, mut p: Peripherals){
     if status_and_rdcr[0] & 0x40 == 0 {
         status_and_rdcr[0] |= 0x40;
     }
-
     info!("new status and config: {:x}", status_and_rdcr);
 
-    // unwrap!(q.custom_instruction(0x01, &status_and_rdcr, &mut []).await);
-    // info!("enabled quad in status");
+    unwrap!(q.custom_instruction(0x01, &status_and_rdcr, &mut []).await);
+    info!("enabled quad in status");
 
     info!("page erasing... ", );
     let before = Instant::now().as_ticks();
@@ -146,12 +145,15 @@ async fn main(spawner: Spawner, mut p: Peripherals){
     defmt::info!("The device ID is: 0x{=u8:x}", id);
     
     let mut fifo_cfg = iim42652::FifoConfig::default();
-    fifo_cfg.mode = FifoMode::StreamToFifo;
-    fifo_cfg.config_reg
-            .with_accel_en(true)
-            .with_temp_en(true)
-            .with_timestamp_fsync_en(true)
-            .with_resume_partial_read_en(true);
+    fifo_cfg.mode = FifoMode::StopOnFull ;
+    defmt::info!("Configuring FIFO");
+    fifo_cfg.config_reg 
+            .set_accel_en(true)
+            .set_temp_en(true)
+            .set_timestamp_fsync_en(true)
+            .set_resume_partial_read_en(true);
+    defmt::info!("with bytes {=[u8]}", (fifo_cfg.into_bytes()));
+
     accelerometer.configure_fifo(fifo_cfg);
     cortex_m::asm::delay(5000000);   // KISS.
 
@@ -161,6 +163,7 @@ async fn main(spawner: Spawner, mut p: Peripherals){
     let mut before_meas = Instant::now().as_ticks();
     loop {
         let mut fifo_level = accelerometer.unread_data_count();
+        info!("fifo level: {}",u16::from(fifo_level));  
         if u16::from(fifo_level) > 2000 {
             info!("fifo full, level: {}",u16::from(fifo_level));  
             let before = Instant::now().as_ticks();
@@ -168,17 +171,16 @@ async fn main(spawner: Spawner, mut p: Peripherals){
             let after = Instant::now().as_ticks();
             info!("measuring took {} ticks", after-before);  
             let before = Instant::now().as_ticks();
-            //unwrap!(q.write(0, &buffer.0).await);
+            unwrap!(q.write(0, &buffer.0).await);
             let after = Instant::now().as_ticks();
             info!("writing took {} ticks", after-before); 
-        
             let after_meas = Instant::now().as_ticks();
             info!("duration of all measurement: {} ticks", after_meas-before_meas);
             before_meas = Instant::now().as_ticks();
             info!("fifo after meas, level: {}",u16::from(accelerometer.unread_data_count()));  
         }
         else{
-            cortex_m::asm::delay(5000);   // KISS.
+            cortex_m::asm::delay(5000000);   // KISS.
         }
     }
     
