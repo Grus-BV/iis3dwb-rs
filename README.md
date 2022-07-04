@@ -16,6 +16,11 @@ Platform-agnostic Rust driver for the ST IIS3DWB 3-axis MEMS accelerometer.
 
 ### Examples
 
+Run the examples in windows
+```powershell
+PS $Env:DEFMT_LOG = "info"
+PS cargo run --example nrf52dk-fifo 
+```
 
 ## License
 

@@ -160,5 +160,10 @@ where
         bytes[0] = Register::FIFO_DATA.addr() | SPI_READ;
         self.read(&mut bytes);
         bytes[1..1401].try_into().unwrap() // this copies
+    } 
+    // TODO sort out error propogation
+    pub fn fifo_read_to_bytes(&mut self, bytes: &mut [u8]) -> () {
+        bytes[0] = Register::FIFO_DATA.addr() | SPI_READ;
+        self.read(bytes);
     }
 } 

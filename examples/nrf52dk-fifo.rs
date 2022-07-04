@@ -43,7 +43,6 @@ pub fn exit() -> ! {
     }
 }
 
-
 #[embassy::main]
 async fn main(spawner: Spawner, mut p: Peripherals){
     defmt::info!("Hello World!");
@@ -59,10 +58,10 @@ async fn main(spawner: Spawner, mut p: Peripherals){
     let mut q = qspi::Qspi::new(
         &mut p.QSPI, 
         &mut irq, 
-    &mut p.P0_19, 
+    &mut p.P0_21, 
     &mut p.P0_17,
+    &mut p.P0_19,
     &mut p.P0_20,
-    &mut p.P0_21,
     &mut p.P0_22,
     &mut p.P0_23,
         config,
@@ -130,22 +129,24 @@ async fn main(spawner: Spawner, mut p: Peripherals){
         let mut irq = interrupt::take!(SPIM3);
         let mut spim = spim::Spim::new( &mut p.SPI3, 
                                                         &mut irq, 
-                                                        &mut p.P0_13,
-                                                        &mut p.P0_16,
                                                         &mut p.P0_15,
+                                                        &mut p.P0_14,
+                                                        &mut p.P0_13,
                                                         config);
 
-        let mut ncs = Output::new(&mut p.P0_14, Level::High, OutputDrive::Standard);
+        let mut ncs = Output::new(&mut p.P0_16, Level::High, OutputDrive::Standard);
         
         defmt::info!("ACC CONFIG");        
 
     let mut acc_cfg = IIM42652Config::default();
     let mut accelerometer = IIM42652::new(spim, ncs, &acc_cfg).unwrap();
+    accelerometer.reset();
+    cortex_m::asm::delay(5000000);   // KISS.
+
     let id = accelerometer.get_device_id();
     defmt::info!("The device ID is: 0x{=u8:x}", id);
     
     let mut fifo_cfg = iim42652::FifoConfig::default();
-    //abomination fix naming
     fifo_cfg.mode.set_mode(FifoMode::StopOnFull);
     defmt::info!("Configuring FIFO");
     fifo_cfg.config_reg.set_accel_en(true);
@@ -166,7 +167,7 @@ async fn main(spawner: Spawner, mut p: Peripherals){
         if u16::from(fifo_level) > 1400 {
             info!("fifo full, level: {}",u16::from(fifo_level));  
             let before = Instant::now().as_ticks();
-            buffer.0 = accelerometer.fifo_read();
+            accelerometer.fifo_read_to_bytes(&mut buffer.0);
             let after = Instant::now().as_ticks();
             info!("measuring took {} ticks", after-before);  
             let before = Instant::now().as_ticks();
@@ -176,19 +177,14 @@ async fn main(spawner: Spawner, mut p: Peripherals){
             let after_meas = Instant::now().as_ticks();
             info!("duration of all measurement: {} ticks", after_meas-before_meas);
             before_meas = Instant::now().as_ticks();
-            info!("fifo after meas, level: {}",u16::from(accelerometer.unread_data_count()));  
+            info!("fifo after meas, level: {}",u16::from(accelerometer.unread_data_count()));
+            info!("data:{:x}",buffer.0[1..100]);
         }
         else{
-            cortex_m::asm::delay(5000);   // KISS.
+            Timer::after(Duration::from_millis(100)).await;
         }
     }
     
-    accelerometer.stop();
-    accelerometer.reset();
-    
-    while accelerometer.resetting() {
-        cortex_m::asm::wfe();
-    }
     defmt::info!("Resetted!");
 
    
