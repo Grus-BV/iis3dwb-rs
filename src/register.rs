@@ -17,7 +17,7 @@ impl Bank {
     }
 }
 
-
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum AccelerometerMode {
     Off = 0b00,
     LowPower = 0b10,
@@ -27,8 +27,18 @@ impl AccelerometerMode {
     pub const fn bits(self) -> u8 {
         self as u8
     }
+
+    pub fn from_bytes(bytes: u8) -> AccelerometerMode{
+        match bytes {
+            0b00  => AccelerometerMode::Off,
+            0b10  => AccelerometerMode::LowPower,
+            0b11  => AccelerometerMode::LowNoise,
+            _ => unreachable!(),
+        }
+    }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum GyroMode {
     Off = 0b00,
     Standby = 0b01,
@@ -38,6 +48,15 @@ pub enum GyroMode {
 impl GyroMode {
     pub const fn bits(self) -> u8 {
         self as u8
+    }
+
+    pub fn from_bytes(bytes: u8) -> GyroMode{
+        match bytes {
+            0b00  => GyroMode::Off,
+            0b01  => GyroMode::Standby,
+            0b11  => GyroMode::LowNoise,
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -496,6 +515,7 @@ pub const MASK_ACCEL_UI_FS_SEL: u8 = 0b1110_0000;
 
 // SIGNAL_PATH_RESET
 pub const TMST_STROBE: u8 = 0b0000_0100;
+pub const FIFO_FLUSH: u8 = 0b0000_0010;
 
 // TMST_CONFIG
 pub const TMST_TO_REGS_EN: u8 = 0b0001_0000;
@@ -504,6 +524,8 @@ pub const TMST_DELTA_EN: u8 = 0b0000_0100;
 pub const TMST_FSYNC_EN: u8 = 0b0000_0010;
 pub const TMST_EN: u8 = 0b0000_0001;
 
+//INTF_CONFIG0
+pub const MASK_INTF_CONFIG0_FIFO:u8 = 0b1111_0000;
 
 // BANK 3 
 // PU_PD_CONFIG2

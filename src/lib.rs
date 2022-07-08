@@ -24,7 +24,7 @@ use micromath::generic_array::{arr, GenericArray, typenum::U3};
 
 pub use fifos::{FifoConfig,
                 FifoMode,
-                Watermark};
+                Watermark,AccelGyroPacketBigEndian};
 // use interrupts::{Interrupt1, Interrupt2};
 // use wakeups::{WakeUp};
 pub use register::{Bank, DataRate, Mode, Range, Register, Register_3, Register_1,
@@ -36,7 +36,7 @@ use register::{DEVICE_ID,
                 MASK_ACCEL_ODR,
                 MASK_ACCEL_UI_FS_SEL,
                 MASK_GYRO_MODE,
-                // MASK_GYRO_ODR,
+                MASK_GYRO_ODR,
                 // MASK_GYRO_UI_FS_SEL,
                 SOFT_RESET_CONFIG,
                 PIN1_PU_EN,
@@ -105,7 +105,7 @@ where
             // interrupt1: config.interrupt1,
             // fifo: config.fifo,
         };
-        IIM42652.reset();
+        //IIM42652.reset();
         cortex_m::asm::delay(10000);
         let id= IIM42652.get_device_id();
         if id != DEVICE_ID {
@@ -141,10 +141,26 @@ where
         cortex_m::asm::delay(12800); // wait 200us
     }  
 
+    pub fn get_acc_mode(&mut self) -> AccelerometerMode {
+        let reg = Register::PWR_MGMT0.addr();
+        let mut output = [0u8];
+        self.read_reg(reg, &mut output);
+        AccelerometerMode::from_bytes(output[0])
+    }  
+
     pub fn set_gyro_mode(&mut self, mode: GyroMode) {
         self.modify_register( Register::PWR_MGMT0.addr(), 
                              MASK_GYRO_MODE, 
                              mode.bits()).unwrap();
+        cortex_m::asm::delay(12800); // wait 200us
+
+    }  
+
+    pub fn get_gyro_mode(&mut self)-> GyroMode {
+        let reg = Register::PWR_MGMT0.addr();
+        let mut output = [0u8];
+        self.read_reg(reg, &mut output);
+        GyroMode::from_bytes(output[0] >> 2)  // TODO Eliminate these one of these things
     }  
 
     pub fn stop(&mut self) {
@@ -174,6 +190,9 @@ where
         self.modify_register( Register::ACCEL_CONFIG0.addr(), 
                                 MASK_ACCEL_ODR, 
                               odr.bits()).unwrap();
+        self.modify_register( Register::GYRO_CONFIG0.addr(), 
+                                MASK_GYRO_ODR, 
+                            odr.bits()).unwrap();
     }
 
     pub fn disable_i2c(&mut self) {
@@ -224,6 +243,16 @@ where
         defmt::trace!("Read after xfer {=[u8]:x}",bytes);
         self.cs.set_high().ok();
     }
+    // TODO replace all reads to this, and make this read.
+    fn read_with_cmd(&mut self, cmd: &mut [u8], bytes: &mut [u8]) {
+        self.cs.set_low().ok();
+        defmt::trace!("Read before xfer {=[u8]:x}",bytes);
+        self.spi.transfer(cmd).ok();
+        self.spi.transfer(bytes).ok();
+        defmt::trace!("Read after xfer {=[u8]:x}",bytes);
+        self.cs.set_high().ok();
+    }
+
 
     fn read_consecutive_regs(){
         unimplemented!();
