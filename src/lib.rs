@@ -215,7 +215,7 @@ where
         let temp_h = ((bytes[1] & 0x0F) as u16) << 8;
         let temp_l = (bytes[2] as u16) & 0x00FF;
 
-        temp_h | temp_l
+        (temp_h | temp_l).try_into().unwrap()
     }
 
     fn write_reg(&mut self, reg: u8, value: u8) {
