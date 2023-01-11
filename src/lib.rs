@@ -179,14 +179,14 @@ where
     }
 
     pub fn set_range(&mut self, range: Range) {
-        defmt::info!("RANGE bits:{=u8:b}", range.bits());
+        defmt::debug!("RANGE bits:{=u8:b}", range.bits());
         self.modify_register( Register::ACCEL_CONFIG0.addr(), 
                                 MASK_ACCEL_UI_FS_SEL, 
                               range.bits()).unwrap();
     }
 
     pub fn set_data_rate(&mut self, odr: DataRate) {
-        defmt::info!("ODR bits:{=u8:b}",odr.bits());
+        defmt::debug!("ODR bits:{=u8:b}",odr.bits());
         self.modify_register( Register::ACCEL_CONFIG0.addr(), 
                                 MASK_ACCEL_ODR, 
                               odr.bits()).unwrap();
