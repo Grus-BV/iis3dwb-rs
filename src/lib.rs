@@ -208,14 +208,14 @@ where
     }
 
       /// Returns the raw contents of the temperature registers
-    pub fn read_temp_raw(&mut self) -> u16 {
+    pub fn read_temp_raw(&mut self) -> i16 {
         let mut bytes = [Register::TEMP_DATA1_UI.addr() | SPI_READ, 0, 0];
         self.read(&mut bytes);
 
-        let temp_h = ((bytes[1] & 0x0F) as u16) << 8;
+        let temp_h = ((bytes[1] & 0xFF) as u16) << 8;
         let temp_l = (bytes[2] as u16) & 0x00FF;
 
-        temp_h | temp_l
+        (temp_h | temp_l) as i16
     }
 
     fn write_reg(&mut self, reg: u8, value: u8) {
