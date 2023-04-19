@@ -180,6 +180,7 @@ where
 
     pub fn set_range(&mut self, range: Range) {
         defmt::debug!("RANGE bits:{=u8:b}", range.bits());
+        self.range = range;
         self.modify_register( Register::ACCEL_CONFIG0.addr(), 
                                 MASK_ACCEL_UI_FS_SEL, 
                               range.bits()).unwrap();
@@ -389,10 +390,12 @@ where
 
     fn accel_norm(&mut self) -> Result<F32x3, Error<Self::Error>> {
 
+        let range = self.range;
+        let range_max = i16::MAX as u32 * range.as_mg() as u32;
         let raw_values: I16x3 = self.accel_raw().unwrap();
-        let norm_values: F32x3 = F32x3::new(raw_values[0] as f32 / 16384.0 ,
-                                            raw_values[1] as f32 / 16384.0 ,
-                                            raw_values[2] as f32 / 16384.0 );
+        let norm_values: F32x3 = F32x3::new(raw_values[0] as f32 / range_max as f32 ,
+                                            raw_values[1] as f32 / range_max as f32 ,
+                                            raw_values[2] as f32 / range_max as f32 );
         Ok(norm_values)
     }
 
