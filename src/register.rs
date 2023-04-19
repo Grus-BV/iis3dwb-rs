@@ -281,13 +281,13 @@ impl Range {
         self as u8
     }
 
-    /// Convert the range into an value in mili-g
-    pub const fn as_mg(self) -> u8 {
+    /// Convert the range into a value in micro-g
+    pub const fn lsb_as_mg(self) -> f64 {
         match self {
-            Range::G16 => 186,
-            Range::G8 => 62,
-            Range::G4 => 32,
-            Range::G2 => 16,
+            Range::G16 => 0.48828125,
+            Range::G8 => 0.244140625,
+            Range::G4 => 0.1220703125,
+            Range::G2 => 0.06103515625,
         }
     }
 }
@@ -312,7 +312,7 @@ impl Threshold {
 
     #[inline(always)]
     pub fn mg(range: Range, mgs: f32) -> Self {
-        let value = mgs / (range.as_mg() as f32);
+        let value = mgs / (range.lsb_as_mg() as f32);
         let truncated = value as u64;
         let round_up = value - (truncated as f32) > 0.5;
         let result = if round_up { truncated + 1 } else { truncated }; 

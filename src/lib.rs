@@ -389,15 +389,18 @@ where
     type Error = E;
 
     fn accel_norm(&mut self) -> Result<F32x3, Error<Self::Error>> {
-
-        let range = self.range;
-        let range_max = i16::MAX as u32 * range.as_mg() as u32;
+        // acceleration has 10 meaningful bits
+        // in 2G config 0xFFF to 0x000 has 4G range.
+        // 4000 mg / 0xFFF is 
+        
+        let lsb_as_mg = self.range.lsb_as_mg();
         let raw_values: I16x3 = self.accel_raw().unwrap();
-        let norm_values: F32x3 = F32x3::new(raw_values[0] as f32 * 1000.0 / range_max as f32 , // from G to mG
-                                            raw_values[1] as f32 * 1000.0 / range_max as f32 ,
-                                            raw_values[2] as f32 * 1000.0 / range_max as f32 );
+        let norm_values: F32x3 = F32x3::new((raw_values[0] as f64 * lsb_as_mg) as f32, // from G to mG
+                                            (raw_values[1] as f64 * lsb_as_mg) as f32 ,
+                                            (raw_values[2] as f64 * lsb_as_mg) as f32 );
         Ok(norm_values)
     }
+    
 
     fn sample_rate(&mut self) -> Result<f32, Error<Self::Error>> {
         Ok(self.get_odr().sample_rate())
