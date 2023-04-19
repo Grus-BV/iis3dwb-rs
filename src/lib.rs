@@ -393,9 +393,9 @@ where
         let range = self.range;
         let range_max = i16::MAX as u32 * range.as_mg() as u32;
         let raw_values: I16x3 = self.accel_raw().unwrap();
-        let norm_values: F32x3 = F32x3::new(raw_values[0] as f32 / range_max as f32 ,
-                                            raw_values[1] as f32 / range_max as f32 ,
-                                            raw_values[2] as f32 / range_max as f32 );
+        let norm_values: F32x3 = F32x3::new(raw_values[0] as f32 * 1000.0 / range_max as f32 , // from G to mG
+                                            raw_values[1] as f32 * 1000.0 / range_max as f32 ,
+                                            raw_values[2] as f32 * 1000.0 / range_max as f32 );
         Ok(norm_values)
     }
 
