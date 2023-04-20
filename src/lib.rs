@@ -12,6 +12,7 @@ use embedded_hal::digital::v2::OutputPin;
 //pub use interrupts::{Interrupt1,InterruptConfigSrc1,InterruptSource1};
 pub use accelerometer::{
     Accelerometer,
+    AccelerometerError,
     RawAccelerometer,
     error,
     Error,
@@ -208,7 +209,7 @@ where
         output[0]
     }
 
-      /// Returns the raw contents of the temperature registers
+    /// Returns the raw contents of the temperature registers
     pub fn read_temp_raw(&mut self) -> i16 {
         let mut bytes = [Register::TEMP_DATA1_UI.addr() | SPI_READ, 0, 0];
         self.read(&mut bytes);
@@ -217,6 +218,12 @@ where
         let temp_l = (bytes[2] as u16) & 0x00FF;
 
         (temp_h | temp_l) as i16
+    }
+
+    /// Returns temperature in Celcuis
+      pub fn get_temp_celcius(&mut self) -> f32 {
+        let raw_temp = self.read_temp_raw();
+        (raw_temp / 132.48) + 25.0
     }
 
     fn write_reg(&mut self, reg: u8, value: u8) {
