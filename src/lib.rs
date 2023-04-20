@@ -12,7 +12,6 @@ use embedded_hal::digital::v2::OutputPin;
 //pub use interrupts::{Interrupt1,InterruptConfigSrc1,InterruptSource1};
 pub use accelerometer::{
     Accelerometer,
-    AccelerometerError,
     RawAccelerometer,
     error,
     Error,
@@ -223,7 +222,7 @@ where
     /// Returns temperature in Celcuis
       pub fn get_temp_celcius(&mut self) -> f32 {
         let raw_temp = self.read_temp_raw();
-        (raw_temp / 132.48) + 25.0
+        (raw_temp as f32/ 132.48) + 25.0
     }
 
     fn write_reg(&mut self, reg: u8, value: u8) {
