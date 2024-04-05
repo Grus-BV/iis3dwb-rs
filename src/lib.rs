@@ -51,6 +51,15 @@ use core::fmt::Debug;
 pub const SPI_READ: u8 = 0b1000_0000;
 const SPI_WRITE: u8 = 0x0000_0000;
 
+
+#[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum DriverError {
+    WrongID,
+    SpiError,
+    GpioError
+}
+
 pub struct Config {
     pub mode: Mode,
     pub datarate: DataRate,
@@ -97,7 +106,7 @@ where
     SPI: spi::Transfer<u8, Error=E> + spi::Write<u8, Error=E>,
     CS: OutputPin <Error= PinError>
 {
-    pub fn new(spi: SPI, cs: CS, config: &Config) -> Result<Self,E> {
+    pub fn new(spi: SPI, cs: CS, config: &Config) -> Result<Self,DriverError> {
         let mut IIM42652 = IIM42652 {
             spi,
             cs, 
