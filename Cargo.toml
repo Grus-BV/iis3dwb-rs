@@ -18,6 +18,7 @@ board_alpha = []
 defmt = []
 # set logging levels here
 default = [
+"defmt",
 "board_alpha",
 # "nightly",
 ]
