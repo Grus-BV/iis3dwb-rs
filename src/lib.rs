@@ -46,8 +46,8 @@ use core::fmt::Debug;
 pub const SPI_READ: u8 = 0b1000_0000;
 const SPI_WRITE: u8 = 0x0000_0000;
 
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, defmt::Format)]
+// #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DriverError {
     WrongID,
     SpiError,
