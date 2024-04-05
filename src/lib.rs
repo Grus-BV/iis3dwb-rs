@@ -45,12 +45,14 @@ use core::fmt::Debug;
 
 pub const SPI_READ: u8 = 0b1000_0000;
 const SPI_WRITE: u8 = 0x0000_0000;
-// #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-#[derive(defmt::Format)]
+
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug)]
 pub enum DriverError {
+    /// The debvvice did not retuirn the DEVICE ID of IIM42652
     WrongID,
-    SpiError,
-    GpioError,
+    /// For bitwise manipulation the mask was empty.
+    RegisterMaskNull,
 }
 
 pub struct Config {
@@ -261,9 +263,9 @@ where
         unimplemented!();
     }
 
-    fn modify_register(&mut self, reg: u8, mask: u8, val: u8) -> Result<(), ()> {
+    fn modify_register(&mut self, reg: u8, mask: u8, val: u8) -> Result<(), DriverError> {
         if mask == 0 {
-            return Err(());
+            return Err(DriverError::RegisterMaskNull);
         }
         let mut register_value = [0u8];
         self.read_reg(reg, &mut register_value);
