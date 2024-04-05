@@ -18,14 +18,15 @@ board_alpha = []
 # set logging levels here
 default = [
 "board_alpha",
-"nightly",
+# "nightly",
 ]
-nightly = ["embassy-nrf/nightly", "embassy-nrf/unstable-traits"]
+# nightly = ["embassy-nrf/nightly", "embassy-nrf/unstable-traits"]
 
+# Removed since emabssy has changed structure and still is pre-release so still uses the same version number
 
-[patch.crates-io]
-embassy = { git = "https://github.com/embassy-rs/embassy" }
-embassy-nrf = {  git = "https://github.com/embassy-rs/embassy" }
+# [patch.crates-io]
+# embassy = { git = "https://github.com/embassy-rs/embassy" }
+# embassy-nrf = {  git = "https://github.com/embassy-rs/embassy" }
 
 
 # # cargo build/run
@@ -82,9 +83,11 @@ modular-bitfield = "0.11.2"
 
 [dev-dependencies]
 nrf52840-hal = {version = "0.14.0",features = ["rt"] } 
-embassy = {version = "0.1.0", features = ["defmt"]}
-embassy-nrf = {version = "0.1.0", features = [ "defmt", "nrf52840", "time-driver-rtc1", "nightly"]}
+# embassy = {version = "0.1.0", features = ["defmt"]}
+# embassy-nrf = {version = "0.1.0", features = [ "defmt", "nrf52840", "time-driver-rtc1", "nightly"]}
 
-[[example]]   
-name = 'nrf52dk'
+# TODO will reestablish examples.
+
+# [[example]]   
+# name = 'nrf52dk'
 
