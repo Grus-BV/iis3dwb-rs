@@ -15,8 +15,10 @@ edition = "2018"
 
 [features]
 board_alpha = []
+defmt = []
 # set logging levels here
 default = [
+"defmt",
 "board_alpha",
 # "nightly",
 ]
